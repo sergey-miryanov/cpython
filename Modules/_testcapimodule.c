@@ -2574,7 +2574,7 @@ bench_tuple_set_item_1(Py_ssize_t loops)
             return NULL;
         }
 
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             Py_DECREF(tuple);
             return NULL;
@@ -2603,7 +2603,7 @@ bench_tuple_set_item_2(Py_ssize_t loops)
             return NULL;
         }
 
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             Py_DECREF(tuple);
             return NULL;
@@ -2614,7 +2614,7 @@ bench_tuple_set_item_2(Py_ssize_t loops)
             return NULL;
         }
 
-        PyObject *two = PyLong_FromLong(1);
+        PyObject *two = PyTuple_New(0);
         if (two == NULL) {
             Py_DECREF(tuple);
             return NULL;
@@ -2643,7 +2643,7 @@ bench_tuple_SET_ITEM_1(Py_ssize_t loops)
             return NULL;
         }
 
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             Py_DECREF(tuple);
             return NULL;
@@ -2667,14 +2667,14 @@ bench_tuple_SET_ITEM_2(Py_ssize_t loops)
             return NULL;
         }
 
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             Py_DECREF(tuple);
             return NULL;
         }
         PyTuple_SET_ITEM(tuple, 0, one);
 
-        PyObject *two = PyLong_FromLong(1);
+        PyObject *two = PyTuple_New(0);
         if (two == NULL) {
             Py_DECREF(tuple);
             return NULL;
@@ -2693,7 +2693,7 @@ bench_tuple_pack_1(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
@@ -2716,11 +2716,11 @@ bench_tuple_pack_2(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
-        PyObject *two = PyLong_FromLong(1);
+        PyObject *two = PyTuple_New(0);
         if (two == NULL) {
             return NULL;
         }
@@ -2744,7 +2744,7 @@ bench_tuple_from_array_1(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
@@ -2768,11 +2768,11 @@ bench_tuple_from_array_2(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
-        PyObject *two = PyLong_FromLong(1);
+        PyObject *two = PyTuple_New(0);
         if (two == NULL) {
             return NULL;
         }
@@ -2797,7 +2797,7 @@ bench_tuple_make_1(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
@@ -2820,11 +2820,11 @@ bench_tuple_make_2(Py_ssize_t loops)
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *one = PyLong_FromLong(0);
+        PyObject *one = PyTuple_New(0);
         if (one == NULL) {
             return NULL;
         }
-        PyObject *two = PyLong_FromLong(1);
+        PyObject *two = PyTuple_New(0);
         if (two == NULL) {
             return NULL;
         }
