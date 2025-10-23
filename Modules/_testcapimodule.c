@@ -2563,31 +2563,26 @@ toggle_reftrace_printer(PyObject *ob, PyObject *arg)
 }
 
 static PyObject *
-bench_tuple(PyObject *ob, PyObject *args)
+bench_tuple_set_item_1(Py_ssize_t loops)
 {
-    Py_ssize_t size, loops;
-    if (!PyArg_ParseTuple(args, "nn", &size, &loops)) {
-        return NULL;
-    }
-
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *tuple = PyTuple_New(size);
+
+        PyObject *tuple = PyTuple_New(1);
         if (tuple == NULL) {
             return NULL;
         }
 
-        for (int j=0; j < size; j++) {
-            PyObject *item = PyLong_FromLong(j);
-            if (item == NULL) {
-                Py_DECREF(tuple);
-                return NULL;
-            }
-            if (PyTuple_SetItem(tuple, j, item) < 0) {
-                Py_DECREF(tuple);
-                return NULL;
-            }
+        PyObject *one = PyLong_FromLong(0);
+        if (one == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+
+        if (PyTuple_SetItem(tuple, 0, one) < 0) {
+            Py_DECREF(tuple);
+            return NULL;
         }
 
         Py_DECREF(tuple);
@@ -2597,29 +2592,94 @@ bench_tuple(PyObject *ob, PyObject *args)
 }
 
 static PyObject *
-bench_tuple_steal(PyObject *ob, PyObject *args)
+bench_tuple_set_item_2(Py_ssize_t loops)
 {
-    Py_ssize_t size, loops;
-    if (!PyArg_ParseTuple(args, "nn", &size, &loops)) {
-        return NULL;
-    }
-
     PyTime_t t1, t2;
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++) {
-        PyObject *tuple = PyTuple_New(size);
+
+        PyObject *tuple = PyTuple_New(2);
         if (tuple == NULL) {
             return NULL;
         }
 
-        for (int j=0; j < size; j++) {
-            PyObject *item = PyLong_FromLong(j);
-            if (item == NULL) {
-                Py_DECREF(tuple);
-                return NULL;
-            }
-            PyTuple_SET_ITEM(tuple, j, item);
+        PyObject *one = PyLong_FromLong(0);
+        if (one == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
         }
+
+        if (PyTuple_SetItem(tuple, 0, one) < 0) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+
+        PyObject *two = PyLong_FromLong(1);
+        if (two == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+
+        if (PyTuple_SetItem(tuple, 1, two) < 0) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+
+        Py_DECREF(tuple);
+    }
+    PyTime_PerfCounterRaw(&t2);
+    return PyFloat_FromDouble(PyTime_AsSecondsDouble(t2 - t1));
+}
+
+static PyObject *
+bench_tuple_SET_ITEM_1(Py_ssize_t loops)
+{
+    PyTime_t t1, t2;
+    PyTime_PerfCounterRaw(&t1);
+    for (Py_ssize_t i=0; i < loops; i++) {
+
+        PyObject *tuple = PyTuple_New(1);
+        if (tuple == NULL) {
+            return NULL;
+        }
+
+        PyObject *one = PyLong_FromLong(0);
+        if (one == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+
+        PyTuple_SET_ITEM(tuple, 0, one);
+        Py_DECREF(tuple);
+    }
+    PyTime_PerfCounterRaw(&t2);
+    return PyFloat_FromDouble(PyTime_AsSecondsDouble(t2 - t1));
+}
+
+static PyObject *
+bench_tuple_SET_ITEM_2(Py_ssize_t loops)
+{
+    PyTime_t t1, t2;
+    PyTime_PerfCounterRaw(&t1);
+    for (Py_ssize_t i=0; i < loops; i++) {
+        PyObject *tuple = PyTuple_New(2);
+        if (tuple == NULL) {
+            return NULL;
+        }
+
+        PyObject *one = PyLong_FromLong(0);
+        if (one == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, 0, one);
+
+        PyObject *two = PyLong_FromLong(1);
+        if (two == NULL) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, 1, two);
 
         Py_DECREF(tuple);
     }
@@ -2783,6 +2843,42 @@ bench_tuple_make_2(Py_ssize_t loops)
 }
 
 static PyObject *
+bench_tuple_set_item(PyObject *ob, PyObject *args)
+{
+    Py_ssize_t size, loops;
+    if (!PyArg_ParseTuple(args, "nn", &size, &loops)) {
+        return NULL;
+    }
+
+    if (size == 1) {
+        return bench_tuple_set_item_1(loops);
+    }
+    else if (size == 2) {
+        return bench_tuple_set_item_2(loops);
+    }
+
+    return PyFloat_FromDouble(0);
+}
+
+static PyObject *
+bench_tuple_SET_ITEM(PyObject *ob, PyObject *args)
+{
+    Py_ssize_t size, loops;
+    if (!PyArg_ParseTuple(args, "nn", &size, &loops)) {
+        return NULL;
+    }
+
+    if (size == 1) {
+        return bench_tuple_SET_ITEM_1(loops);
+    }
+    else if (size == 2) {
+        return bench_tuple_SET_ITEM_2(loops);
+    }
+
+    return PyFloat_FromDouble(0);
+}
+
+static PyObject *
 bench_tuple_make(PyObject *ob, PyObject *args)
 {
     Py_ssize_t size, loops;
@@ -2932,8 +3028,8 @@ static PyMethodDef TestMethods[] = {
     {"test_atexit", test_atexit, METH_NOARGS},
     {"code_offset_to_line", _PyCFunction_CAST(code_offset_to_line), METH_FASTCALL},
     {"toggle_reftrace_printer", toggle_reftrace_printer, METH_O},
-    {"bench_tuple", bench_tuple, METH_VARARGS},
-    {"bench_tuple_steal", bench_tuple_steal, METH_VARARGS},
+    {"bench_tuple_set_item", bench_tuple_set_item, METH_VARARGS},
+    {"bench_tuple_SET_ITEM", bench_tuple_SET_ITEM, METH_VARARGS},
     {"bench_tuple_make", bench_tuple_make, METH_VARARGS},
     {"bench_tuple_pack", bench_tuple_pack, METH_VARARGS},
     {"bench_tuple_from_array", bench_tuple_from_array, METH_VARARGS},
