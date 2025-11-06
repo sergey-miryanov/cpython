@@ -583,6 +583,10 @@ filter_traverse(PyObject *self, visitproc visit, void *arg)
 static PyObject *
 filter_next(PyObject *self)
 {
+    if (_Py_EnterRecursiveCall(" filter_next")) {
+        return NULL;
+    }
+
     filterobject *lz = _filterobject_CAST(self);
     PyObject *item;
     PyObject *it = lz->it;
@@ -593,8 +597,10 @@ filter_next(PyObject *self)
     iternext = *Py_TYPE(it)->tp_iternext;
     for (;;) {
         item = iternext(it);
-        if (item == NULL)
+        if (item == NULL) {
+            _Py_LeaveRecursiveCall();
             return NULL;
+        }
 
         if (checktrue) {
             ok = PyObject_IsTrue(item);
@@ -603,16 +609,21 @@ filter_next(PyObject *self)
             good = PyObject_CallOneArg(lz->func, item);
             if (good == NULL) {
                 Py_DECREF(item);
+                _Py_LeaveRecursiveCall();
                 return NULL;
             }
             ok = PyObject_IsTrue(good);
             Py_DECREF(good);
         }
-        if (ok > 0)
+        if (ok > 0) {
+            _Py_LeaveRecursiveCall();
             return item;
+        }
         Py_DECREF(item);
-        if (ok < 0)
+        if (ok < 0) {
+            _Py_LeaveRecursiveCall();
             return NULL;
+        }
     }
 }
 
