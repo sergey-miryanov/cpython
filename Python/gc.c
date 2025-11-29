@@ -1653,11 +1653,78 @@ assess_work_to_do(GCState *gcstate)
     return new_objects + heap_fraction;
 }
 
+static FILE *_gc_trace_file = NULL;
+static PyTime_t _gc_trace_start;
+static void
+gc_write_trace_file(
+    PyThreadState *tstate,
+    const char *trace_tag,
+    struct gc_collection_stats *stats,
+    int64_t run_id,
+    int64_t scavenge_id
+)
+{
+    GCState *gcstate = &tstate->interp->gc;
+    DWORD pid = GetCurrentProcessId();
+    if (_gc_trace_file == NULL) {
+        char filename[_MAX_PATH * 10];
+        memset(filename, 0, sizeof(filename));
+        sprintf(filename, "../gc_trace-%u.txt", pid);
+
+         _gc_trace_file = fopen(filename, "a+");
+        if (_gc_trace_file != NULL) {
+            (void)PyTime_PerfCounterRaw(&_gc_trace_start);
+            char *cmd = GetCommandLineA();
+            fprintf(_gc_trace_file, "cmd;%s\n", cmd);
+            fprintf(_gc_trace_file, "start;%lld\n", _gc_trace_start);
+            fprintf(_gc_trace_file, "dt_ns;run_id;scavenge_id;tag;phase;pid;tid;young_count;heap_size;increment_size;objects_marked;unreachable_count;work_to_do;young_size;visited_size;pending_size;old0_size;old1_size;visited_space;loops;collected;uncollectable;candidates\n");
+        }
+    }
+
+    if (_gc_trace_file == NULL) {
+        Py_FatalError("Cannot open gc_trace file");
+    }
+
+    PyTime_t ts;
+    (void)PyTime_PerfCounterRaw(&ts);
+    fprintf(_gc_trace_file, "%lld;%lld;%lld;%s;%s;%u;%u;%lld;%lld;%lld;%lld;%lld;%lld;%lld;%lld;%lld;%lld;%lld;%d;%lld;%lld;%lld;%lld\n",
+        (ts - _gc_trace_start),
+        run_id,
+        scavenge_id,
+        trace_tag,
+        "-",
+        pid,
+        tstate->thread_id,
+        (int64_t)gcstate->young.count,
+        (int64_t)gcstate->heap_size,
+        (int64_t)stats->increment_size,
+        (int64_t)stats->objects_marked,
+        (int64_t)0,
+        (int64_t)gcstate->work_to_do,
+        (int64_t)gc_list_size(&gcstate->young.head),
+        (int64_t)gc_list_size(&gcstate->old[gcstate->visited_space].head),
+        (int64_t)gc_list_size(&gcstate->old[gcstate->visited_space^1].head),
+        (int64_t)gc_list_size(&gcstate->old[0].head),
+        (int64_t)gc_list_size(&gcstate->old[1].head),
+        gcstate->visited_space,
+        (int64_t)stats->increment_loops,
+        (int64_t)stats->collected,
+        (int64_t)stats->uncollectable,
+        (int64_t)stats->candidates
+    );
+}
+
 static void
 gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
 {
     GC_STAT_ADD(1, collections, 1);
     GCState *gcstate = &tstate->interp->gc;
+    static int64_t run_id = 0;
+    static int64_t scavenge_id = 0;
+    run_id += 1;
+
+    gc_write_trace_file(tstate, "B", stats, run_id, scavenge_id);
+
     gcstate->work_to_do += assess_work_to_do(gcstate);
     if (gcstate->work_to_do < 0) {
         return;
@@ -1668,6 +1735,9 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
         GC_STAT_ADD(1, objects_transitively_reachable, objects_marked);
         gcstate->work_to_do -= objects_marked;
         stats->candidates += objects_marked;
+        stats->objects_marked = objects_marked;
+
+        gc_write_trace_file(tstate, "M", stats, run_id, scavenge_id);
         validate_spaces(gcstate);
         return;
     }
@@ -1685,7 +1755,9 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     gc_list_set_space(&gcstate->young.head, gcstate->visited_space);
     gc_list_merge(&gcstate->young.head, &increment);
     gc_list_validate_space(&increment, gcstate->visited_space);
-    Py_ssize_t increment_size = gc_list_size(&increment);
+    Py_ssize_t young_count = gc_list_size(&increment);
+    Py_ssize_t increment_loops = 0;
+    Py_ssize_t increment_size = young_count;
     while (increment_size < gcstate->work_to_do) {
         if (gc_list_is_empty(not_visited)) {
             break;
@@ -1696,17 +1768,27 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
         assert(!_Py_IsImmortal(FROM_GC(gc)));
         gc_set_old_space(gc, gcstate->visited_space);
         increment_size += expand_region_transitively_reachable(&increment, gc, gcstate);
+        increment_loops += 1;
     }
     GC_STAT_ADD(1, objects_not_transitively_reachable, increment_size);
+    stats->objects_marked = objects_marked;
+    stats->young_count = young_count;
+    stats->increment_size = increment_size;
+    stats->increment_loops = increment_loops;
     validate_list(&increment, collecting_clear_unreachable_clear);
     gc_list_validate_space(&increment, gcstate->visited_space);
     PyGC_Head survivors;
     gc_list_init(&survivors);
+    gc_write_trace_file(tstate, "C", stats, run_id, scavenge_id);
     gc_collect_region(tstate, &increment, &survivors, stats);
     gc_list_merge(&survivors, visited);
     assert(gc_list_is_empty(&increment));
     gcstate->work_to_do -= increment_size;
 
+    if (gc_list_is_empty(not_visited)) {
+        scavenge_id = run_id;
+    }
+    gc_write_trace_file(tstate, "F", stats, run_id, scavenge_id);
     if (gc_list_is_empty(not_visited)) {
         completed_scavenge(gcstate);
     }
@@ -2117,6 +2199,13 @@ _PyGC_Collect(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     }
     if (reason != _Py_GC_REASON_SHUTDOWN) {
         invoke_gc_callback(gcstate, "stop", generation, &stats);
+    }
+    else {
+        if (_gc_trace_file != NULL) {
+            fflush(_gc_trace_file);
+            fclose(_gc_trace_file);
+            _gc_trace_file = NULL;
+        }
     }
     _PyErr_SetRaisedException(tstate, exc);
     GC_STAT_ADD(generation, objects_collected, stats.collected);

@@ -183,6 +183,10 @@ struct gc_collection_stats {
     Py_ssize_t candidates;
     // Duration of the collection in seconds:
     double duration;
+    Py_ssize_t objects_marked;
+    Py_ssize_t young_count;
+    Py_ssize_t increment_size;
+    Py_ssize_t increment_loops;
 };
 
 /* Running stats per generation */
