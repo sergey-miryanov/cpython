@@ -1729,12 +1729,17 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     if (gcstate->phase == GC_PHASE_MARK) {
         Py_ssize_t objects_marked = mark_at_start(tstate);
         GC_STAT_ADD(1, objects_transitively_reachable, objects_marked);
-        Py_ssize_t pending_size = gc_list_size(&gcstate->old[gcstate->visited_space^1].head);
-        intptr_t scale_factor = gcstate->old[0].threshold;
-        if (scale_factor < 2) {
-            scale_factor = 2;
+        // Py_ssize_t pending_size = gc_list_size(&gcstate->old[gcstate->visited_space^1].head);
+        Py_ssize_t pending_size = gcstate->heap_size - objects_marked;
+        if (pending_size < 0) {
+            pending_size = 0;
         }
-        Py_ssize_t work_to_do = pending_size / SCAN_RATE_DIVISOR / scale_factor;
+        // intptr_t scale_factor = gcstate->old[0].threshold;
+        // if (scale_factor < 2) {
+        //     scale_factor = 2;
+        // }
+        // Py_ssize_t work_to_do = pending_size / SCAN_RATE_DIVISOR / scale_factor;
+        Py_ssize_t work_to_do = gcstate->young.threshold;
         Py_ssize_t new_objects = gcstate->young.count;
         if (work_to_do > new_objects * 2) {
             work_to_do = new_objects * 2;
