@@ -1725,33 +1725,48 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
 
     gc_write_trace_file(tstate, "B", stats, run_id, scavenge_id);
 
-    gcstate->work_to_do += assess_work_to_do(gcstate);
-    if (gcstate->work_to_do < 0) {
-        return;
-    }
     untrack_tuples(&gcstate->young.head);
     if (gcstate->phase == GC_PHASE_MARK) {
         Py_ssize_t objects_marked = mark_at_start(tstate);
         GC_STAT_ADD(1, objects_transitively_reachable, objects_marked);
-        gcstate->work_to_do -= objects_marked;
+        Py_ssize_t pending_size = gc_list_size(&gcstate->old[gcstate->visited_space^1].head);
+        intptr_t scale_factor = gcstate->old[0].threshold;
+        if (scale_factor < 2) {
+            scale_factor = 2;
+        }
+        Py_ssize_t work_to_do = pending_size / SCAN_RATE_DIVISOR / scale_factor;
+        Py_ssize_t new_objects = gcstate->young.count;
+        if (work_to_do > new_objects * 2) {
+            work_to_do = new_objects * 2;
+        }
+        else if (work_to_do < new_objects) {
+            work_to_do = new_objects;
+        }
+
+        Py_ssize_t increments_count = pending_size / work_to_do;
+        if (increments_count < 256) {
+            increments_count = 256;
+        }
+
+        gcstate->work_to_do = new_objects + work_to_do;
+        gcstate->increments_count = increments_count;
         stats->candidates += objects_marked;
         stats->objects_marked = objects_marked;
 
         gc_write_trace_file(tstate, "M", stats, run_id, scavenge_id);
         validate_spaces(gcstate);
+        gcstate->phase = GC_PHASE_COLLECT;
+        gcstate->young.count = 0;
         return;
     }
     PyGC_Head *not_visited = &gcstate->old[gcstate->visited_space^1].head;
     PyGC_Head *visited = &gcstate->old[gcstate->visited_space].head;
     PyGC_Head increment;
     gc_list_init(&increment);
-    int scale_factor = gcstate->old[0].threshold;
-    if (scale_factor < 2) {
-        scale_factor = 2;
-    }
-    intptr_t objects_marked = mark_stacks(tstate->interp, visited, gcstate->visited_space, false);
-    GC_STAT_ADD(1, objects_transitively_reachable, objects_marked);
-    gcstate->work_to_do -= objects_marked;
+
+    // intptr_t objects_marked = mark_stacks(tstate->interp, visited, gcstate->visited_space, false);
+    // GC_STAT_ADD(1, objects_transitively_reachable, objects_marked);
+    // gcstate->work_to_do -= objects_marked;
     gc_list_set_space(&gcstate->young.head, gcstate->visited_space);
     gc_list_merge(&gcstate->young.head, &increment);
     gc_list_validate_space(&increment, gcstate->visited_space);
@@ -1771,7 +1786,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
         increment_loops += 1;
     }
     GC_STAT_ADD(1, objects_not_transitively_reachable, increment_size);
-    stats->objects_marked = objects_marked;
+    // stats->objects_marked = objects_marked;
     stats->young_count = young_count;
     stats->increment_size = increment_size;
     stats->increment_loops = increment_loops;
@@ -1783,13 +1798,16 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     gc_collect_region(tstate, &increment, &survivors, stats);
     gc_list_merge(&survivors, visited);
     assert(gc_list_is_empty(&increment));
-    gcstate->work_to_do -= increment_size;
+    // gcstate->work_to_do -= increment_size;
+    gcstate->increments_count -= 1;
+    gcstate->young.count = 0;
 
-    if (gc_list_is_empty(not_visited)) {
+    bool stop = gcstate->increments_count == 0; // || gc_list_is_empty(not_visited);
+    if (stop) {
         scavenge_id = run_id;
     }
     gc_write_trace_file(tstate, "F", stats, run_id, scavenge_id);
-    if (gc_list_is_empty(not_visited)) {
+    if (stop) {
         completed_scavenge(gcstate);
     }
     validate_spaces(gcstate);

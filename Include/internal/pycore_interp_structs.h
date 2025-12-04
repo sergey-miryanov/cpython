@@ -234,6 +234,7 @@ struct _gc_runtime_state {
 
     Py_ssize_t heap_size;
     Py_ssize_t work_to_do;
+    Py_ssize_t increments_count;
     /* Which of the old spaces is the visited space */
     int visited_space;
     int phase;
