@@ -1808,6 +1808,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     gcstate->young.count = 0;
 
     bool stop = gcstate->increments_count == 0; // || gc_list_is_empty(not_visited);
+    stop = gc_list_is_empty(not_visited) && gc_list_size(visited) > gcstate->heap_size / 4;
     if (stop) {
         scavenge_id = run_id;
     }
