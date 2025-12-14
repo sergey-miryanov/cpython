@@ -284,14 +284,18 @@ static inline void _PyObject_GC_UNTRACK(
 #ifdef Py_GIL_DISABLED
     _PyObject_CLEAR_GC_BITS(op, _PyGC_BITS_TRACKED);
 #else
+struct _gc_runtime_state *gcstate = &_PyInterpreterState_GET()->gc;
     PyGC_Head *gc = _Py_AS_GC(op);
+    if ((gc->_gc_next & _PyGC_NEXT_MASK_OLD_SPACE_1) == gcstate->visited_space) {
+        gcstate->visited_count--;
+        // assert (gcstate->visited_count >= 0);
+    }
     PyGC_Head *prev = _PyGCHead_PREV(gc);
     PyGC_Head *next = _PyGCHead_NEXT(gc);
     _PyGCHead_SET_NEXT(prev, next);
     _PyGCHead_SET_PREV(next, prev);
     gc->_gc_next = 0;
     gc->_gc_prev &= _PyGC_PREV_MASK_FINALIZED;
-    struct _gc_runtime_state *gcstate = &_PyInterpreterState_GET()->gc;
     if (gcstate->young.count > 0) {
         gcstate->young.count--;
     }
