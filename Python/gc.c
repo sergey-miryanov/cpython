@@ -1734,7 +1734,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
         gcstate->visited_count += objects_marked;
         stats->candidates += objects_marked;
 
-        gc_write_trace_file(tstate, "M", stats, run_id, scavenge_id);
+        // gc_write_trace_file(tstate, "M", stats, run_id, scavenge_id);
         validate_spaces(gcstate);
         gcstate->phase = GC_PHASE_COLLECT;
         gcstate->young.count = 0;
@@ -1792,7 +1792,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     if (stop) {
         scavenge_id = run_id;
     }
-    gc_write_trace_file(tstate, "F", stats, run_id, scavenge_id);
+    // gc_write_trace_file(tstate, "F", stats, run_id, scavenge_id);
     if (stop) {
         completed_scavenge(gcstate);
     }
