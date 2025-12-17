@@ -1788,7 +1788,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
     assert(gc_list_is_empty(&increment));
 
     // assert(gcstate->visited_count == gc_list_size(visited));
-    bool stop = gc_list_is_empty(not_visited) && gcstate->visited_count > gcstate->heap_size / 4;
+    bool stop = gc_list_is_empty(not_visited) && gcstate->longlived_count > gcstate->heap_size / 4;
     if (stop) {
         scavenge_id = run_id;
     }
