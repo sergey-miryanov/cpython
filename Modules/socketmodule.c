@@ -111,6 +111,7 @@ Local naming conventions:
 #include "pycore_moduleobject.h"  // _PyModule_GetState
 #include "pycore_object.h"        // _PyObject_VisitType()
 #include "pycore_time.h"          // _PyTime_AsMilliseconds()
+#include "pycore_tuple.h"         // _PyTuple_FromPairSteal
 #include "pycore_pystate.h"       // _Py_AssertHoldsTstate()
 
 #ifdef _Py_MEMORY_SANITIZER
@@ -3129,7 +3130,8 @@ sock_accept(PyObject *self, PyObject *Py_UNUSED(ignored))
     if (addr == NULL)
         goto finally;
 
-    res = PyTuple_Pack(2, sock, addr);
+    res = _PyTuple_FromPairSteal(sock, addr);
+    return res;
 
 finally:
     Py_XDECREF(sock);
@@ -4197,7 +4199,7 @@ sock_recvfrom(PyObject *self, PyObject *args)
         goto finally;
     }
 
-    ret = PyTuple_Pack(2, buf, addr);
+    ret = _PyTuple_FromPair(buf, addr);
     Py_DECREF(buf);
 
 finally:
@@ -6598,7 +6600,7 @@ socket_socketpair(PyObject *self, PyObject *args)
     s1 = new_sockobject(state, sv[1], family, type, proto);
     if (s1 == NULL)
         goto finally;
-    res = PyTuple_Pack(2, s0, s1);
+    res = _PyTuple_FromPair(s0, s1);
 
 finally:
     if (res == NULL) {

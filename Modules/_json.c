@@ -14,6 +14,7 @@
 #include "pycore_global_strings.h" // _Py_ID()
 #include "pycore_pyerrors.h"      // _PyErr_FormatNote
 #include "pycore_runtime.h"       // _PyRuntime
+#include "pycore_tuple.h"         // _PyTuple_FromPair
 #include "pycore_unicodeobject.h" // _PyUnicode_CheckConsistency()
 
 #include <stdbool.h>              // bool
@@ -457,14 +458,7 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
         Py_DECREF(rval);
         return NULL;
     }
-    tpl = PyTuple_New(2);
-    if (tpl == NULL) {
-        Py_DECREF(pyidx);
-        Py_DECREF(rval);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(tpl, 0, rval);
-    PyTuple_SET_ITEM(tpl, 1, pyidx);
+    tpl = _PyTuple_FromPairSteal(rval, pyidx);
     return tpl;
 }
 
@@ -806,11 +800,10 @@ _parse_object_unicode(PyScannerObject *s, PyObject *memo, PyObject *pystr, Py_ss
                 goto bail;
 
             if (has_pairs_hook) {
-                PyObject *item = PyTuple_Pack(2, key, val);
+                PyObject *item = _PyTuple_FromPairSteal(key, val);
+                key = val = NULL;
                 if (item == NULL)
                     goto bail;
-                Py_CLEAR(key);
-                Py_CLEAR(val);
                 if (PyList_Append(rval, item) == -1) {
                     Py_DECREF(item);
                     goto bail;
