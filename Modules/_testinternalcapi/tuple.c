@@ -48,11 +48,11 @@ bench_tuple_new_pair(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
@@ -100,11 +100,11 @@ bench_tuple_pack_pair(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
@@ -149,11 +149,11 @@ bench_tuple_from_array_pair(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
@@ -198,11 +198,11 @@ bench_tuple_from_array_pair_steal(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
@@ -245,11 +245,11 @@ bench_tuple_from_pair(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
@@ -294,11 +294,11 @@ bench_tuple_from_pair_steal(PyObject *Py_UNUSED(module), PyObject *obj)
     PyTime_PerfCounterRaw(&t1);
     for (Py_ssize_t i=0; i < loops; i++)
     {
-        PyObject *one = PyLong_FromLong(100001);
+        PyObject *one = PyList_New(1); // PyLong_FromLong(100001);
         if (one == NULL) {
             goto error;
         }
-        PyObject *two = PyLong_FromLong(100002);
+        PyObject *two = PyList_New(1); // PyLong_FromLong(100002);
         if (two == NULL) {
             Py_DECREF(one);
             goto error;
