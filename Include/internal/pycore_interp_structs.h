@@ -206,6 +206,11 @@ enum _GCPhase {
     GC_PHASE_COLLECT = 1
 };
 
+enum _GCType {
+    GC_INCREMENTAL = 0,
+    GC_3G = 1,
+};
+
 /* If we change this, we need to change the default value in the
    signature of gc.collect and change the size of PyStats.gc_stats */
 #define NUM_GENERATIONS 3
@@ -235,6 +240,12 @@ struct _gc_runtime_state {
     /* Which of the old spaces is the visited space */
     int visited_space;
     int phase;
+
+#ifndef Py_GIL_DISABLED
+    int gc_type;
+    Py_ssize_t long_lived_pending;
+    Py_ssize_t long_lived_total;
+#endif
 
 #ifdef Py_GIL_DISABLED
     /* This is the number of objects that survived the last full

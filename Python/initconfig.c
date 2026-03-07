@@ -199,6 +199,8 @@ static const PyConfigSpec PYCONFIG_SPEC[] = {
     SPEC(pythonpath_env, WSTR_OPT, INIT_ONLY, NO_SYS),
     SPEC(sys_path_0, WSTR_OPT, INIT_ONLY, NO_SYS),
 
+    SPEC(gc, INT, READ_ONLY, NO_SYS),
+
     // Array terminator
     {NULL, 0, 0, 0, NO_SYS},
 };
@@ -365,6 +367,8 @@ The following implementation-specific options are available:\n\
 -X utf8[=0|1]: enable (1) or disable (0) UTF-8 mode; also PYTHONUTF8\n\
 -X warn_default_encoding: enable opt-in EncodingWarning for 'encoding=None';\n\
          also PYTHONWARNDEFAULTENCODING\
+-X gc=[incremental|3gen]: control GC type;\n\
+         default is incremental; also PYTHON_GC\n\
 ";
 
 /* Envvars that don't have equivalent command-line options are listed first */
@@ -459,6 +463,7 @@ static const char usage_envvars[] =
 "PYTHONWARNDEFAULTENCODING: enable opt-in EncodingWarning for 'encoding=None'\n"
 "                  (-X warn_default_encoding)\n"
 "PYTHONWARNINGS  : warning control (-W)\n"
+"PYTHON_GC: control GC type (-X gc)\n"
 ;
 
 #if defined(MS_WINDOWS)
@@ -960,6 +965,8 @@ config_check_consistency(const PyConfig *config)
 #ifdef Py_STATS
     assert(config->_pystats >= 0);
 #endif
+    // gc can be 0(incremental) or 1(3gen)
+    assert(config->gc >= 0 && config->gc <= 1);
     return 1;
 }
 #endif
@@ -1076,6 +1083,7 @@ _PyConfig_InitCompatConfig(PyConfig *config)
     config->enable_gil = _PyConfig_GIL_DEFAULT;
     config->tlbc_enabled = 1;
 #endif
+    config->gc = -1;
 }
 
 
@@ -2379,6 +2387,44 @@ config_init_pathconfig_warnings(PyConfig *config)
     return _PyStatus_OK();
 }
 
+
+static PyStatus
+config_init_gc(PyConfig *config)
+{
+    int gc = -1;
+
+    const char *env = config_get_env(config, "PYTHON_GC");
+    if (env) {
+        if (strcmp(env, "incremental") == 0) {
+            gc = 0;
+        }
+        else if (strcmp(env, "3gen") == 0) {
+            gc = 1;
+        }
+        else {
+            return _PyStatus_ERR("PYTHON_GC: invalid value; "
+                                 "expected 'incremental', '3gen'");
+        }
+        config->gc = gc;
+    }
+
+    const wchar_t *x_value = config_get_xoption_value(config, L"gc");
+    if (x_value) {
+        if (wcscmp(x_value, L"incremental") == 0) {
+            gc = 0;
+        }
+        else if (wcscmp(x_value, L"3gen") == 0) {
+            gc = 1;
+        }
+        else {
+            return _PyStatus_ERR("-X gc: invalid value; "
+                                 "expected 'incremental', '3gen'");
+        }
+        config->gc = gc;
+    }
+    return _PyStatus_OK();
+}
+
 static PyStatus
 config_read_complex_options(PyConfig *config)
 {
@@ -2478,6 +2524,13 @@ config_read_complex_options(PyConfig *config)
     status = config_init_pathconfig_warnings(config);
     if (_PyStatus_EXCEPTION(status)) {
         return status;
+    }
+
+    if (config->gc < 0) {
+        status = config_init_gc(config);
+        if (_PyStatus_EXCEPTION(status)) {
+            return status;
+        }
     }
 
     return _PyStatus_OK();
@@ -2852,6 +2905,10 @@ config_read(PyConfig *config, int compute_path_config)
     // Only parse arguments once.
     if (config->parse_argv == 1) {
         config->parse_argv = 2;
+    }
+
+    if (config->gc < 0) {
+        config->gc = 0;
     }
 
     return _PyStatus_OK();

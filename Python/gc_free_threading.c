@@ -1692,6 +1692,12 @@ _PyGC_InitState(GCState *gcstate)
     gcstate->young.threshold = 2000;
 }
 
+void
+_PyGC_SetType(GCState *gcstate, struct PyConfig *config)
+{
+    // do nothing
+}
+
 
 PyStatus
 _PyGC_Init(PyInterpreterState *interp)

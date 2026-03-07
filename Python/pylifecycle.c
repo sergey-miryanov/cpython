@@ -644,6 +644,8 @@ pycore_create_interpreter(_PyRuntimeState *runtime,
         return status;
     }
 
+    _PyGC_SetType(&interp->gc, &interp->config);
+
     /* Auto-thread-state API */
     status = _PyGILState_Init(interp);
     if (_PyStatus_EXCEPTION(status)) {

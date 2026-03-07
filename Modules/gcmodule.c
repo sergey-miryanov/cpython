@@ -206,10 +206,19 @@ gc_get_count_impl(PyObject *module)
     gc->alloc_count = 0;
 #endif
 
-    return Py_BuildValue("(iii)",
-                         gcstate->young.count,
-                         gcstate->old[gcstate->visited_space].count,
-                         gcstate->old[gcstate->visited_space^1].count);
+    if (gcstate->gc_type == GC_INCREMENTAL) {
+        return Py_BuildValue("(iii)",
+                            gcstate->young.count,
+                            gcstate->old[gcstate->visited_space].count,
+                            gcstate->old[gcstate->visited_space^1].count);
+    }
+    else {
+        assert(gcstate->gc_type == GC_3G);
+        return Py_BuildValue("(iii)",
+                            gcstate->young.count,
+                            gcstate->old[0].count,
+                            gcstate->old[1].count);
+    }
 }
 
 /*[clinic input]
