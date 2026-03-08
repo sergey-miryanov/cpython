@@ -12,6 +12,7 @@ extern "C" {
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "pycore_typedefs.h"      // _PyInterpreterFrame
 
+#define Py_GC_3G
 
 /* Get an object's GC head */
 static inline PyGC_Head* _Py_AS_GC(PyObject *op) {
@@ -164,8 +165,12 @@ static inline PyGC_Head* _PyGCHead_NEXT(PyGC_Head *gc) {
 }
 static inline void _PyGCHead_SET_NEXT(PyGC_Head *gc, PyGC_Head *next) {
     uintptr_t unext = (uintptr_t)next;
+#ifndef Py_GC_3G
     assert((unext & ~_PyGC_PREV_MASK) == 0);
     gc->_gc_next = (gc->_gc_next & ~_PyGC_PREV_MASK) | unext;
+#else
+    gc->_gc_next = unext;
+#endif
 }
 
 // Lowest two bits of _gc_prev is used for _PyGC_PREV_MASK_* flags.
@@ -249,8 +254,12 @@ static inline void _PyObject_GC_TRACK(
     PyGC_Head *last = (PyGC_Head*)(generation0->_gc_prev);
     _PyGCHead_SET_NEXT(last, gc);
     _PyGCHead_SET_PREV(gc, last);
+#ifndef Py_GC_3G
     uintptr_t not_visited = 1 ^ gcstate->visited_space;
     gc->_gc_next = ((uintptr_t)generation0) | not_visited;
+#else
+    _PyGCHead_SET_NEXT(gc, generation0);
+#endif
     generation0->_gc_prev = (uintptr_t)gc;
     gcstate->young.count++; /* number of tracked GC objects */
     gcstate->heap_size++;
