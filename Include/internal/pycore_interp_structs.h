@@ -230,6 +230,11 @@ struct _gc_runtime_state {
     int visited_space;
     int phase;
 
+#ifndef Py_GIL_DISABLED
+    Py_ssize_t long_lived_pending;
+    Py_ssize_t long_lived_total;
+#endif
+
 #ifdef Py_GIL_DISABLED
     /* This is the number of objects that survived the last full
        collection. It approximates the number of long lived objects

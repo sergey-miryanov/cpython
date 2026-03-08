@@ -100,6 +100,7 @@ gc_decref(PyGC_Head *g)
     g->_gc_prev -= 1 << _PyGC_PREV_SHIFT;
 }
 
+#ifndef Py_GC_3G
 static inline int
 gc_old_space(PyGC_Head *g)
 {
@@ -126,10 +127,36 @@ gc_set_old_space(PyGC_Head *g, int space)
     g->_gc_next &= ~_PyGC_NEXT_MASK_OLD_SPACE_1;
     g->_gc_next |= space;
 }
+#else
+static inline int
+gc_old_space(PyGC_Head *g)
+{
+    assert(0);
+    return g->_gc_next & _PyGC_NEXT_MASK_OLD_SPACE_1;
+}
+
+static inline int
+other_space(int space)
+{
+    assert(space == 0 || space == 1);
+    return space ^ _PyGC_NEXT_MASK_OLD_SPACE_1;
+}
+
+static inline void
+gc_flip_old_space(PyGC_Head *g)
+{
+}
+
+static inline void
+gc_set_old_space(PyGC_Head *g, int space)
+{
+}
+#endif
 
 static PyGC_Head *
 GEN_HEAD(GCState *gcstate, int n)
 {
+#ifndef Py_GC_3G
     assert((gcstate->visited_space & (~1)) == 0);
     switch(n) {
         case 0:
@@ -141,7 +168,36 @@ GEN_HEAD(GCState *gcstate, int n)
         default:
             Py_UNREACHABLE();
     }
+#else
+    switch(n) {
+        case 0:
+            return &gcstate->young.head;
+        case 1:
+            return &gcstate->old[0].head;
+        case 2:
+            return &gcstate->old[1].head;
+        default:
+            Py_UNREACHABLE();
+    }
+#endif
 }
+
+#ifdef Py_GC_3G
+static struct gc_generation *
+GEN(GCState *gcstate, int n)
+{
+    switch(n) {
+        case 0:
+            return &gcstate->young;
+        case 1:
+            return &gcstate->old[0];
+        case 2:
+            return &gcstate->old[1];
+        default:
+            Py_UNREACHABLE();
+    }
+}
+#endif
 
 static GCState *
 get_gc_state(void)
@@ -322,8 +378,10 @@ gc_list_merge(PyGC_Head *from, PyGC_Head *to)
         PyGC_Head *from_tail = GC_PREV(from);
         assert(from_head != from);
         assert(from_tail != from);
+#ifndef Py_GC_3G
         assert(gc_list_is_empty(to) ||
             gc_old_space(to_tail) == gc_old_space(from_tail));
+#endif
 
         _PyGCHead_SET_NEXT(to_tail, from_head);
         _PyGCHead_SET_PREV(from_head, to_tail);
@@ -682,7 +740,11 @@ move_unreachable(PyGC_Head *young, PyGC_Head *unreachable)
 
     validate_consistent_old_space(young);
     /* Record which old space we are in, and set NEXT_MASK_UNREACHABLE bit for convenience */
+#ifndef Py_GC_3G
     uintptr_t flags = NEXT_MASK_UNREACHABLE | (gc->_gc_next & _PyGC_NEXT_MASK_OLD_SPACE_1);
+#else
+    uintptr_t flags = NEXT_MASK_UNREACHABLE;
+#endif
     while (gc != young) {
         if (gc_get_refs(gc)) {
             /* gc is definitely reachable from outside the
@@ -733,7 +795,7 @@ move_unreachable(PyGC_Head *young, PyGC_Head *unreachable)
             gc->_gc_next = flags | (uintptr_t)unreachable;
             unreachable->_gc_prev = (uintptr_t)gc;
         }
-        gc = _PyGCHead_NEXT(prev);
+        gc = GC_NEXT(prev);
     }
     // young->_gc_prev must be last element remained in the list.
     young->_gc_prev = (uintptr_t)prev;
@@ -1271,6 +1333,7 @@ gc_collect_region(PyThreadState *tstate,
                   PyGC_Head *to,
                   struct gc_collection_stats *stats);
 
+#ifndef Py_GC_3G
 static inline Py_ssize_t
 gc_list_set_space(PyGC_Head *list, int space)
 {
@@ -1282,6 +1345,13 @@ gc_list_set_space(PyGC_Head *list, int space)
     }
     return size;
 }
+#else
+static inline Py_ssize_t
+gc_list_set_space(PyGC_Head *list, int space)
+{
+    return 0;
+}
+#endif
 
 /* Making progress in the incremental collector
  * In order to eventually collect all cycles
@@ -1315,9 +1385,14 @@ gc_collect_young(PyThreadState *tstate,
                  struct gc_collection_stats *stats)
 {
     GCState *gcstate = &tstate->interp->gc;
+#ifndef Py_GC_3G
+    int next_space = gcstate->visited_space;
+#else
+    int next_space = 0;
+#endif
     validate_spaces(gcstate);
     PyGC_Head *young = &gcstate->young.head;
-    PyGC_Head *visited = &gcstate->old[gcstate->visited_space].head;
+    PyGC_Head *visited = &gcstate->old[next_space].head;
     untrack_tuples(young);
     GC_STAT_ADD(0, collections, 1);
 #ifdef Py_STATS
@@ -1332,12 +1407,12 @@ gc_collect_young(PyThreadState *tstate,
 
     PyGC_Head survivors;
     gc_list_init(&survivors);
-    gc_list_set_space(young, gcstate->visited_space);
+    gc_list_set_space(young, next_space);
     gc_collect_region(tstate, young, &survivors, stats);
     gc_list_merge(&survivors, visited);
     validate_spaces(gcstate);
     gcstate->young.count = 0;
-    gcstate->old[gcstate->visited_space].count++;
+    gcstate->old[next_space].count++;
     add_stats(gcstate, 0, stats);
     validate_spaces(gcstate);
 }
@@ -1411,6 +1486,7 @@ expand_region_transitively_reachable(PyGC_Head *container, PyGC_Head *gc, GCStat
 static void
 completed_scavenge(GCState *gcstate)
 {
+#ifndef Py_GC_3G
     /* We must observe two invariants:
     * 1. Members of the permanent generation must be marked visited.
     * 2. We cannot touch members of the permanent generation. */
@@ -1434,6 +1510,9 @@ completed_scavenge(GCState *gcstate)
     assert(gc_list_is_empty(&gcstate->old[visited].head));
     gcstate->work_to_do = 0;
     gcstate->phase = GC_PHASE_MARK;
+#else
+    assert(gc_list_is_empty(&gcstate->old[0].head));
+#endif
 }
 
 static intptr_t
@@ -1461,7 +1540,7 @@ mark_all_reachable(PyGC_Head *reachable, PyGC_Head *visited, int visited_space)
         .size = 0
     };
     while (!gc_list_is_empty(reachable)) {
-        PyGC_Head *gc = _PyGCHead_NEXT(reachable);
+        PyGC_Head *gc = GC_NEXT(reachable);
         assert(gc_old_space(gc) == visited_space);
         gc_list_move(gc, visited);
         PyObject *op = FROM_GC(gc);
@@ -1635,7 +1714,7 @@ gc_collect_increment(PyThreadState *tstate, struct gc_collection_stats *stats)
         if (gc_list_is_empty(not_visited)) {
             break;
         }
-        PyGC_Head *gc = _PyGCHead_NEXT(not_visited);
+        PyGC_Head *gc = GC_NEXT(not_visited);
         gc_list_move(gc, &increment);
         increment_size++;
         assert(!_Py_IsImmortal(FROM_GC(gc)));
@@ -1665,10 +1744,18 @@ gc_collect_full(PyThreadState *tstate,
 {
     GC_STAT_ADD(2, collections, 1);
     GCState *gcstate = &tstate->interp->gc;
+
+#ifndef Py_GC_3G
+    int pending_space = gcstate->visited_space^1;
+    int visited_space = gcstate->visited_space;
+#else
+    int pending_space = 0;
+    int visited_space = 1;
+#endif
     validate_spaces(gcstate);
     PyGC_Head *young = &gcstate->young.head;
-    PyGC_Head *pending = &gcstate->old[gcstate->visited_space^1].head;
-    PyGC_Head *visited = &gcstate->old[gcstate->visited_space].head;
+    PyGC_Head *pending = &gcstate->old[pending_space].head;
+    PyGC_Head *visited = &gcstate->old[visited_space].head;
     untrack_tuples(young);
     /* merge all generations into visited */
     gc_list_merge(young, pending);
@@ -1688,6 +1775,105 @@ gc_collect_full(PyThreadState *tstate,
     _PyGC_ClearAllFreeLists(tstate->interp);
     validate_spaces(gcstate);
     add_stats(gcstate, 2, stats);
+}
+
+/* Find the oldest generation (highest numbered) where the count
+ * exceeds the threshold.  Objects in the that generation and
+ * generations younger than it will be collected. */
+static int
+gc_select_generation(GCState *gcstate)
+{
+    struct gc_generation *gen = NULL;
+    for (int i = NUM_GENERATIONS-1; i >= 0; i--) {
+        gen = GEN(gcstate, i);
+        if (gen->count > gen->threshold) {
+            /* Avoid quadratic performance degradation in number
+               of tracked objects (see also issue #4074):
+
+               To limit the cost of garbage collection, there are two strategies;
+                 - make each collection faster, e.g. by scanning fewer objects
+                 - do less collections
+               This heuristic is about the latter strategy.
+
+               In addition to the various configurable thresholds, we only trigger a
+               full collection if the ratio
+
+                long_lived_pending / long_lived_total
+
+               is above a given value (hardwired to 25%).
+
+               The reason is that, while "non-full" collections (i.e., collections of
+               the young and middle generations) will always examine roughly the same
+               number of objects -- determined by the aforementioned thresholds --,
+               the cost of a full collection is proportional to the total number of
+               long-lived objects, which is virtually unbounded.
+
+               Indeed, it has been remarked that doing a full collection every
+               <constant number> of object creations entails a dramatic performance
+               degradation in workloads which consist in creating and storing lots of
+               long-lived objects (e.g. building a large list of GC-tracked objects would
+               show quadratic performance, instead of linear as expected: see issue #4074).
+
+               Using the above ratio, instead, yields amortized linear performance in
+               the total number of objects (the effect of which can be summarized
+               thusly: "each full garbage collection is more and more costly as the
+               number of objects grows, but we do fewer and fewer of them").
+
+               This heuristic was suggested by Martin von Löwis on python-dev in
+               June 2008. His original analysis and proposal can be found at:
+               http://mail.python.org/pipermail/python-dev/2008-June/080579.html
+            */
+            if (i == NUM_GENERATIONS - 1
+                && gcstate->long_lived_pending < gcstate->long_lived_total / 4)
+            {
+                continue;
+            }
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void
+gc_collect_3g(PyThreadState *tstate,
+                struct gc_collection_stats *stats)
+{
+    int i;
+    GCState *gcstate = &tstate->interp->gc;
+    int generation = gc_select_generation(gcstate);
+    if (generation < 0) {
+        return;
+    }
+    assert(generation >= 0 && generation < NUM_GENERATIONS);
+
+    for(i = 0; i < generation; i++) {
+        gc_list_merge(GEN_HEAD(gcstate, i), GEN_HEAD(gcstate, generation));
+    }
+
+    PyGC_Head *young; /* the generation we are examining */
+    PyGC_Head *old; /* next older generation */
+
+    young = GEN_HEAD(gcstate, generation);
+    if (generation < NUM_GENERATIONS-1) {
+        old = GEN_HEAD(gcstate, generation+1);
+    }
+    else {
+        old = young;
+    }
+
+    gc_collect_region(tstate, young, old, stats);
+
+    /* update collection and allocation counters */
+    if (generation+1 < NUM_GENERATIONS) {
+        GEN(gcstate, generation+1)->count += 1;
+    }
+    for (i = 0; i <= generation; i++) {
+        GEN(gcstate, i)->count = 0;
+    }
+
+    if (generation == NUM_GENERATIONS-1) {
+        _PyGC_ClearAllFreeLists(tstate->interp);
+    }
 }
 
 /* This is the main function. Read this to understand how the
@@ -1711,9 +1897,23 @@ gc_collect_region(PyThreadState *tstate,
     validate_consistent_old_space(from);
     untrack_tuples(from);
     validate_consistent_old_space(to);
+#ifndef Py_GC_3G
     if (from != to) {
         gc_list_merge(from, to);
     }
+#else
+    if (from != to) {
+        if (from == &gcstate->old[0].head) {
+            gcstate->long_lived_pending += gc_list_size(from);
+        }
+
+        gc_list_merge(from, to);
+    }
+    else {
+        gcstate->long_lived_pending = 0;
+        gcstate->long_lived_total = gc_list_size(from);
+    }
+#endif
     validate_consistent_old_space(to);
     /* Move reachable objects to next generation. */
 
@@ -2039,7 +2239,11 @@ _PyGC_Collect(PyThreadState *tstate, int generation, _PyGC_Reason reason)
             gc_collect_young(tstate, &stats);
             break;
         case 1:
+#ifndef Py_GC_3G
             gc_collect_increment(tstate, &stats);
+#else
+            gc_collect_3g(tstate, &stats);
+#endif
             break;
         case 2:
             gc_collect_full(tstate, &stats);
