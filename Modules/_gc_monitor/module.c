@@ -60,7 +60,10 @@ typedef struct {
     Py_ssize_t object_visits;
     Py_ssize_t objects_transitively_reachable;
     Py_ssize_t objects_not_transitively_reachable;
+    Py_ssize_t heap_size;
+    Py_ssize_t work_to_do;
     double duration;
+    double total_duration;
 
 } GCMonitorStatsItem;
 
@@ -161,7 +164,10 @@ _gc_monitor_handler_read(PyObject *op, PyObject *Py_UNUSED(ignored))
             item->object_visits = stats_item->object_visits;
             item->objects_transitively_reachable = stats_item->objects_transitively_reachable;
             item->objects_not_transitively_reachable = stats_item->objects_not_transitively_reachable;
+            item->heap_size = stats_item->heap_size;
+            item->work_to_do = stats_item->work_to_do;
             item->duration = stats_item->duration;
+            item->total_duration = stats_item->total_duration;
 
             PyTuple_SET_ITEM(tuple, index, item);
         }
@@ -229,7 +235,10 @@ static PyMemberDef GCMonitorStatsItem_members[] = {
     {"object_visits", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, object_visits), Py_READONLY},
     {"objects_transitively_reachable", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, objects_transitively_reachable), Py_READONLY},
     {"objects_not_transitively_reachable", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, objects_not_transitively_reachable), Py_READONLY},
+    {"heap_size", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, heap_size), Py_READONLY},
+    {"work_to_do", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, work_to_do), Py_READONLY},
     {"duration", Py_T_DOUBLE, offsetof(GCMonitorStatsItem, duration), Py_READONLY},
+    {"total_duration", Py_T_DOUBLE, offsetof(GCMonitorStatsItem, total_duration), Py_READONLY},
     {NULL}
 };
 
