@@ -166,6 +166,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zlib-ng", "zlib-ng.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_remote_debugging", "_remote_debugging.vcxproj", "{4D7C112F-3083-4D9E-9754-9341C14D9B39}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_gc_monitor", "_gc_monitor.vcxproj", "{0AFDA9E0-AF10-42D9-A5FD-925A0618106F}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_zstd", "_zstd.vcxproj", "{07029B86-F3E9-443E-86FB-78AA6D47FED1}"
 EndProject
 Global
