@@ -201,8 +201,13 @@ struct gc_generation_stats {
     double total_duration;
 };
 
-struct gc_generation_stats_buffer {
+struct gc_young_stats_buffer {
     struct gc_generation_stats items[11];
+    int8_t index;
+};
+
+struct gc_old_stats_buffer {
+    struct gc_generation_stats items[3];
     int8_t index;
 };
 
@@ -216,7 +221,8 @@ enum _GCPhase {
 #define NUM_GENERATIONS 3
 
 struct gc_stats {
-    struct gc_generation_stats_buffer gen[NUM_GENERATIONS];
+    struct gc_young_stats_buffer young;
+    struct gc_old_stats_buffer old[2];
 };
 
 struct _gc_runtime_state {
