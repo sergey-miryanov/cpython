@@ -51,7 +51,8 @@ typedef struct {
 
 typedef struct {
     PyObject_HEAD
-    PyTime_t ts;
+    PyTime_t ts_start;
+    PyTime_t ts_stop;
     int gen;
     Py_ssize_t collections;
     Py_ssize_t collected;
@@ -62,8 +63,6 @@ typedef struct {
     Py_ssize_t objects_not_transitively_reachable;
     Py_ssize_t heap_size;
     Py_ssize_t work_to_do;
-    double duration;
-    double total_duration;
 
 } GCMonitorStatsItem;
 
@@ -139,23 +138,33 @@ _gc_monitor_handler_read(PyObject *op, PyObject *Py_UNUSED(ignored))
         return NULL;
     }
 
-    PyObject *tuple = PyTuple_New(NUM_GENERATIONS * 11);
+    PyObject *tuple = PyTuple_New(GC_YOUNG_STATS_SIZE + GC_OLD_STATS_SIZE * 2);
     if (tuple == NULL) {
         return NULL;
     }
 
     int index = 0;
     for(int gen = 0; gen < NUM_GENERATIONS; gen++) {
-        struct gc_generation_stats_buffer *buffer = &stats.gen[gen];
-        for(int i = 0; i < 11; i++, index++) {
-            struct gc_generation_stats *stats_item = &buffer->items[i];
+        struct gc_generation_stats **items;
+        int size;
+        if (gen == 0) {
+            items = (struct gc_generation_stats **)&stats.young.items;
+            size = GC_YOUNG_STATS_SIZE;
+        }
+        else {
+            items = (struct gc_generation_stats **)&stats.old[gen-1].items;
+            size = GC_OLD_STATS_SIZE;
+        }
+        for(int i = 0; i < size; i++, index++) {
+            struct gc_generation_stats *stats_item = items[i];
             GCMonitorStatsItem *item = PyObject_New(GCMonitorStatsItem, st->GCMonitorStatsItem_Type);
             if (item == NULL) {
                 Py_DECREF(tuple);
                 return NULL;
             }
 
-            item->ts = stats_item->ts;
+            item->ts_start = stats_item->ts_start;
+            item->ts_stop = stats_item->ts_stop;
             item->gen = gen;
             item->collections = stats_item->collections;
             item->collected = stats_item->collected;
@@ -166,8 +175,6 @@ _gc_monitor_handler_read(PyObject *op, PyObject *Py_UNUSED(ignored))
             item->objects_not_transitively_reachable = stats_item->objects_not_transitively_reachable;
             item->heap_size = stats_item->heap_size;
             item->work_to_do = stats_item->work_to_do;
-            item->duration = stats_item->duration;
-            item->total_duration = stats_item->total_duration;
 
             PyTuple_SET_ITEM(tuple, index, item);
         }
@@ -226,7 +233,8 @@ static PyType_Spec GCMonitorHandler_spec = {
 // -- GC Monitor Stats Item --
 
 static PyMemberDef GCMonitorStatsItem_members[] = {
-    {"ts", Py_T_LONGLONG, offsetof(GCMonitorStatsItem, ts), Py_READONLY},
+    {"ts_start", Py_T_LONGLONG, offsetof(GCMonitorStatsItem, ts_start), Py_READONLY},
+    {"ts_stop", Py_T_LONGLONG, offsetof(GCMonitorStatsItem, ts_stop), Py_READONLY},
     {"gen", Py_T_LONG, offsetof(GCMonitorStatsItem, gen), Py_READONLY},
     {"collections", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, collections), Py_READONLY},
     {"collected", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, collected), Py_READONLY},
@@ -237,8 +245,6 @@ static PyMemberDef GCMonitorStatsItem_members[] = {
     {"objects_not_transitively_reachable", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, objects_not_transitively_reachable), Py_READONLY},
     {"heap_size", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, heap_size), Py_READONLY},
     {"work_to_do", Py_T_PYSSIZET, offsetof(GCMonitorStatsItem, work_to_do), Py_READONLY},
-    {"duration", Py_T_DOUBLE, offsetof(GCMonitorStatsItem, duration), Py_READONLY},
-    {"total_duration", Py_T_DOUBLE, offsetof(GCMonitorStatsItem, total_duration), Py_READONLY},
     {NULL}
 };
 
