@@ -498,8 +498,7 @@ typevar_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(tv->evaluate_constraints);
     Py_VISIT(tv->default_value);
     Py_VISIT(tv->evaluate_default);
-    PyObject_VisitManagedDict(self, visit, arg);
-    return 0;
+    return PyObject_VisitManagedDict(self, visit, arg);
 }
 
 static int
@@ -816,7 +815,7 @@ typevar_typing_prepare_subst_impl(typevarobject *self, PyObject *alias,
     }
     Py_DECREF(params);
     PyErr_Format(PyExc_TypeError,
-                 "Too few arguments for %S; actual %d, expected at least %d",
+                 "Too few arguments for %S; actual %zd, expected at least %zd",
                  alias, args_len, i + 1);
     return NULL;
 }
@@ -1193,8 +1192,7 @@ paramspec_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(ps->bound);
     Py_VISIT(ps->default_value);
     Py_VISIT(ps->evaluate_default);
-    PyObject_VisitManagedDict(self, visit, arg);
-    return 0;
+    return PyObject_VisitManagedDict(self, visit, arg);
 }
 
 static int
@@ -1690,8 +1688,7 @@ typevartuple_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(tvt->name);
     Py_VISIT(tvt->default_value);
     Py_VISIT(tvt->evaluate_default);
-    PyObject_VisitManagedDict(self, visit, arg);
-    return 0;
+    return PyObject_VisitManagedDict(self, visit, arg);
 }
 
 static int
