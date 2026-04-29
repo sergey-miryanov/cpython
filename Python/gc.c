@@ -1343,14 +1343,25 @@ invoke_gc_callback(PyThreadState *tstate, const char *phase,
 }
 
 static size_t
-gc_list_validate_alive_tag(PyGC_Head *head, int space) {
+gc_list_validate_alive_tag(PyGC_Head *list, int alive_tag) {
     size_t not_valid_count = 0;
-    PyGC_Head *gc = GC_NEXT(head);
-    while (gc != head) {
-        not_valid_count += (gc_alive_tag(gc) != space);
-        gc = GC_NEXT(gc);
+    PyGC_Head *gc;
+    for (gc = GC_NEXT(list); gc != list; gc = GC_NEXT(gc)) {
+        not_valid_count += (gc_alive_tag(gc) != alive_tag);
     }
     return not_valid_count;
+}
+
+static inline Py_ssize_t
+gc_list_set_alive_tag(PyGC_Head *list, int alive_tag)
+{
+    Py_ssize_t size = 0;
+    PyGC_Head *gc;
+    for (gc = GC_NEXT(list); gc != list; gc = GC_NEXT(gc)) {
+        gc_set_alive_tag(gc, alive_tag);
+        size++;
+    }
+    return size;
 }
 
 struct container_and_flag {
@@ -1484,19 +1495,6 @@ mark_alive(PyThreadState *tstate, PyGC_Head *alive)
     assert(gc_list_is_empty(&reachable));
 
     return objects_marked;
-}
-
-
-static inline Py_ssize_t
-gc_list_set_alive_tag(PyGC_Head *list, int space)
-{
-    Py_ssize_t size = 0;
-    PyGC_Head *gc;
-    for (gc = GC_NEXT(list); gc != list; gc = GC_NEXT(gc)) {
-        gc_set_alive_tag(gc, space);
-        size++;
-    }
-    return size;
 }
 
 /* Find the oldest generation (highest numbered) where the count
