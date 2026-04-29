@@ -1342,6 +1342,7 @@ invoke_gc_callback(PyThreadState *tstate, const char *phase,
     assert(!_PyErr_Occurred(tstate));
 }
 
+#ifdef GC_DEBUG
 static size_t
 gc_list_validate_alive_tag(PyGC_Head *list, int alive_tag) {
     size_t not_valid_count = 0;
@@ -1351,6 +1352,7 @@ gc_list_validate_alive_tag(PyGC_Head *list, int alive_tag) {
     }
     return not_valid_count;
 }
+#endif
 
 static inline Py_ssize_t
 gc_list_set_alive_tag(PyGC_Head *list, int alive_tag)
@@ -1414,7 +1416,7 @@ mark_all_reachable(PyGC_Head *reachable, PyGC_Head *alive, int alive_tag)
         traverseproc traverse = Py_TYPE(op)->tp_traverse;
         (void) traverse(op, visit_add_to_container, &arg);
     }
-    gc_list_validate_alive_tag(alive, alive_tag);
+    assert(0 == gc_list_validate_alive_tag(alive, alive_tag));
     return arg.size;
 }
 
