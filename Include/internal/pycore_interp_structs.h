@@ -212,10 +212,6 @@ struct gc_old_stats_buffer {
     int8_t index;
 };
 
-enum _GCPhase {
-    GC_PHASE_MARK = 0,
-    GC_PHASE_COLLECT = 1
-};
 
 /* If we change this, we need to change the default value in the
    signature of gc.collect and change the size of PyStats.gc_stats */
@@ -253,10 +249,8 @@ struct _gc_runtime_state {
 
     /* The number of live objects. */
     Py_ssize_t heap_size;
-    Py_ssize_t work_to_do;
     /* Which of the old spaces is the visited space */
     int visited_space;
-    int phase;
 
     /* This is the number of objects that survived the last full
        collection. It approximates the number of long lived objects
@@ -286,9 +280,7 @@ struct _gc_runtime_state {
         { .threshold = 10, }, \
     }, \
     .heap_size = 0, \
-    .work_to_do = 0, \
-    .visited_space = 0, \
-    .phase = GC_PHASE_MARK
+    .visited_space = 0,
 #else
 #define GC_GENERATION_INIT \
     .young = { .threshold = 2000, }, \

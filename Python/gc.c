@@ -1512,34 +1512,34 @@ expand_region_transitively_reachable(PyGC_Head *gc,
     return arg.size;
 }
 
-/* Do bookkeeping for a completed GC cycle */
-static void
-completed_scavenge(GCState *gcstate)
-{
-    /* We must observe two invariants:
-    * 1. Members of the permanent generation must be marked visited.
-    * 2. We cannot touch members of the permanent generation. */
-    int visited;
-    if (gc_list_is_empty(&gcstate->permanent_generation.head)) {
-        /* Permanent generation is empty so we can flip spaces bit */
-        int not_visited = gcstate->visited_space;
-        visited = other_space(not_visited);
-        gcstate->visited_space = visited;
-        /* Make sure all objects have visited bit set correctly */
-        gc_list_set_space(GEN_HEAD(gcstate, 0), not_visited);
-    }
-    else {
-         /* We must move the objects from visited to pending space. */
-        visited = gcstate->visited_space;
-        int not_visited = other_space(visited);
-        assert(gc_list_is_empty(PENDING_HEAD(gcstate)));
-        gc_list_merge(VISITED_HEAD(gcstate), PENDING_HEAD(gcstate));
-        gc_list_set_space(PENDING_HEAD(gcstate), not_visited);
-    }
-    assert(gc_list_is_empty(VISITED_HEAD(gcstate)));
-    gcstate->work_to_do = 0;
-    gcstate->phase = GC_PHASE_MARK;
-}
+// /* Do bookkeeping for a completed GC cycle */
+// static void
+// completed_scavenge(GCState *gcstate)
+// {
+//     /* We must observe two invariants:
+//     * 1. Members of the permanent generation must be marked visited.
+//     * 2. We cannot touch members of the permanent generation. */
+//     int visited;
+//     if (gc_list_is_empty(&gcstate->permanent_generation.head)) {
+//         /* Permanent generation is empty so we can flip spaces bit */
+//         int not_visited = gcstate->visited_space;
+//         visited = other_space(not_visited);
+//         gcstate->visited_space = visited;
+//         /* Make sure all objects have visited bit set correctly */
+//         gc_list_set_space(GEN_HEAD(gcstate, 0), not_visited);
+//     }
+//     else {
+//          /* We must move the objects from visited to pending space. */
+//         visited = gcstate->visited_space;
+//         int not_visited = other_space(visited);
+//         assert(gc_list_is_empty(PENDING_HEAD(gcstate)));
+//         gc_list_merge(VISITED_HEAD(gcstate), PENDING_HEAD(gcstate));
+//         gc_list_set_space(PENDING_HEAD(gcstate), not_visited);
+//     }
+//     assert(gc_list_is_empty(VISITED_HEAD(gcstate)));
+//     gcstate->work_to_do = 0;
+//     gcstate->phase = GC_PHASE_MARK;
+// }
 
 static intptr_t
 move_to_reachable(PyObject *op, PyGC_Head *reachable, int visited_space)
