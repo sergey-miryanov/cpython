@@ -1653,32 +1653,22 @@ mark_alive(PyThreadState *tstate, PyGC_Head *visited, int visited_space)
 }
 
 static intptr_t
-assess_work_to_do(GCState *gcstate)
+assess_increment_size(GCState *gcstate)
 {
-    /* The amount of work we want to do depends on three things.
-     * 1. The number of new objects created
-     * 2. The growth in heap size since the last collection
-     * 3. The heap size (up to the number of new objects, to avoid quadratic effects)
-     *
-     * For a steady state heap, the amount of work to do is three times the number
-     * of new objects added to the heap. This ensures that we stay ahead in the
-     * worst case of all new objects being garbage.
-     *
-     * This could be improved by tracking survival rates, but it is still a
-     * large improvement on the non-marking approach.
-     */
-    intptr_t scale_factor = gcstate->generations[2].threshold;
-    if (scale_factor < 2) {
-        scale_factor = 2;
+    size_t heap_size = gcstate->heap_size;
+
+    // for default values we get 100
+    size_t divisor = gcstate->generations[1].threshold * gcstate->generations[2].threshold;
+    if (divisor < 2) {
+        divisor = 2;
     }
-    intptr_t new_objects = gcstate->generations[0].count;
-    intptr_t max_heap_fraction = new_objects*2;
-    intptr_t heap_fraction = gcstate->heap_size / SCAN_RATE_DIVISOR / scale_factor;
-    if (heap_fraction > max_heap_fraction) {
-        heap_fraction = max_heap_fraction;
+    size_t fraction = heap_size / divisor;
+    size_t max_fraction = gcstate->generations[0].count * 2;
+    if (fraction > max_fraction) {
+        fraction = max_fraction;
     }
-    gcstate->generations[0].count = 0;
-    return new_objects + heap_fraction;
+
+    return fraction;
 }
 
 
@@ -1927,7 +1917,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
 
         gc_list_merge(GEN_HEAD(gcstate, generation), &temp);
 
-        Py_ssize_t increment_size = 1024;
+        Py_ssize_t increment_size = assess_increment_size(gcstate);
         steal_pending(PENDING_HEAD(gcstate), &temp, pending_space, visited_space, increment_size);
 
         young = &temp;
@@ -1942,7 +1932,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, generation), pending_space));
         gc_list_merge(GEN_HEAD(gcstate, generation), &temp);
 
-        Py_ssize_t increment_size = 1024;
+        Py_ssize_t increment_size = assess_increment_size(gcstate);
         steal_pending(PENDING_HEAD(gcstate), &temp, pending_space, visited_space, increment_size);
 
         young = &temp;
