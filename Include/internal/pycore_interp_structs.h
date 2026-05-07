@@ -260,6 +260,9 @@ struct _gc_runtime_state {
        the first time. */
     Py_ssize_t long_lived_pending;
 
+    /* Current alive tag value (possible 0 or 1). */
+    int alive_tag;
+
 #ifdef Py_GIL_DISABLED
     /* True if gc.freeze() has been used. */
     int freeze_active;
@@ -285,7 +288,8 @@ struct _gc_runtime_state {
         { .threshold = 10, }, \
         { .threshold = 10, }, \
     }, \
-    .heap_size = 0,
+    .heap_size = 0, \
+    .alive_tag = 0,
 #else
 #define GC_GENERATION_INIT \
     .young = { .threshold = 2000, }, \
