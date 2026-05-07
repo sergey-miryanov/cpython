@@ -212,6 +212,11 @@ struct gc_old_stats_buffer {
     int8_t index;
 };
 
+enum _GCPhase {
+    GC_PHASE_MARK = 0,
+    GC_PHASE_COLLECT = 1
+};
+
 /* If we change this, we need to change the default value in the
    signature of gc.collect and change the size of PyStats.gc_stats */
 #define NUM_GENERATIONS 3
@@ -228,6 +233,7 @@ struct _gc_runtime_state {
     /* linked lists of container objects */
 #ifndef Py_GIL_DISABLED
     struct gc_generation generations[NUM_GENERATIONS];
+    PyGC_Head old[2];
 #else
     struct gc_generation young;
     struct gc_generation old[2];
@@ -247,6 +253,10 @@ struct _gc_runtime_state {
 
     /* The number of live objects. */
     Py_ssize_t heap_size;
+    Py_ssize_t work_to_do;
+    /* Which of the old spaces is the visited space */
+    int visited_space;
+    int phase;
 
     /* This is the number of objects that survived the last full
        collection. It approximates the number of long lived objects
@@ -275,7 +285,10 @@ struct _gc_runtime_state {
         { .threshold = 10, }, \
         { .threshold = 10, }, \
     }, \
-    .heap_size = 0,
+    .heap_size = 0, \
+    .work_to_do = 0, \
+    .visited_space = 0, \
+    .phase = GC_PHASE_MARK
 #else
 #define GC_GENERATION_INIT \
     .young = { .threshold = 2000, }, \

@@ -118,6 +118,21 @@ static inline void _PyObject_GC_SET_SHARED(PyObject *op) {
 /* Bit 1 is set when the object is in generation which is GCed currently. */
 #define _PyGC_PREV_MASK_COLLECTING ((uintptr_t)2)
 
+/* Bit 0 in _gc_next is the old space bit.
+ * It is set as follows:
+ * Young: gcstate->visited_space
+ * old[0]: 0
+ * old[1]: 1
+ * permanent: 0
+ *
+ * During a collection all objects handled should have the bit set to
+ * gcstate->visited_space, as objects are moved from the young gen
+ * and the increment into old[gcstate->visited_space].
+ * When object are moved from the pending space, old[gcstate->visited_space^1]
+ * into the increment, the old space bit is flipped.
+*/
+#define _PyGC_NEXT_MASK_OLD_SPACE_1    1
+
 #define _PyGC_PREV_SHIFT           2
 #define _PyGC_PREV_MASK            (((uintptr_t) -1) << _PyGC_PREV_SHIFT)
 
@@ -144,11 +159,13 @@ typedef enum {
 // Lowest bit of _gc_next is used for flags only in GC.
 // But it is always 0 for normal code.
 static inline PyGC_Head* _PyGCHead_NEXT(PyGC_Head *gc) {
-    uintptr_t next = gc->_gc_next;
+    uintptr_t next = gc->_gc_next & _PyGC_PREV_MASK;
     return (PyGC_Head*)next;
 }
 static inline void _PyGCHead_SET_NEXT(PyGC_Head *gc, PyGC_Head *next) {
-    gc->_gc_next = (uintptr_t)next;
+    uintptr_t unext = (uintptr_t)next;
+    assert((unext & ~_PyGC_PREV_MASK) == 0);
+    gc->_gc_next = (gc->_gc_next & ~_PyGC_PREV_MASK) | unext;
 }
 
 // Lowest two bits of _gc_prev is used for _PyGC_PREV_MASK_* flags.
@@ -228,7 +245,8 @@ static inline void _PyObject_GC_TRACK(
     PyGC_Head *last = (PyGC_Head*)(generation0->_gc_prev);
     _PyGCHead_SET_NEXT(last, gc);
     _PyGCHead_SET_PREV(gc, last);
-    _PyGCHead_SET_NEXT(gc, generation0);
+    uintptr_t not_visited = 1 ^ gcstate->visited_space;
+    gc->_gc_next = ((uintptr_t)generation0) | not_visited;
     generation0->_gc_prev = (uintptr_t)gc;
     gcstate->heap_size++;
 #endif
