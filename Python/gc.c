@@ -1654,18 +1654,30 @@ mark_alive(PyThreadState *tstate, PyGC_Head *visited, int visited_space)
 static intptr_t
 assess_increment_size(GCState *gcstate)
 {
-    size_t heap_size = gcstate->heap_size;
-
-    // for default values we get 100
-    size_t divisor = gcstate->generations[1].threshold * gcstate->generations[2].threshold;
-    if (divisor < 2) {
-        divisor = 2;
+    if (gcstate->long_lived_total == 0) {
+        return 0;
     }
-    size_t fraction = heap_size / divisor;
-    size_t max_fraction = gcstate->generations[0].count * 2;
+
+    struct gc_generation *generations = gcstate->generations;
+    Py_ssize_t total_steps = generations[0].threshold * generations[1].threshold;
+    Py_ssize_t steps = total_steps - gcstate->step;
+    if (steps <= 0) {
+        steps = 2;
+    }
+
+    Py_ssize_t count = gcstate->long_lived_total - gcstate->processed;
+    if (count < 0) {
+        count = 0;
+    }
+
+    size_t fraction = count / steps;
+    size_t max_fraction = generations[0].count * 2;
     if (fraction > max_fraction) {
         fraction = max_fraction;
     }
+
+    gcstate->step += 1;
+    gcstate->processed += fraction;
 
     return fraction;
 }
@@ -1986,6 +1998,8 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         // with only atomic values.
         gcstate->long_lived_pending = 0;
         gcstate->long_lived_total = young_size + old_size;
+        gcstate->processed = 0;
+        gcstate->step = 0;
 
         if (gc_list_is_empty(&gcstate->permanent_generation.head)) {
             gcstate->visited_space = other_space(gcstate->visited_space);
