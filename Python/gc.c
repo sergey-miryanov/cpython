@@ -1319,7 +1319,6 @@ deduce_unreachable(PyGC_Head *base, PyGC_Head *unreachable) {
      * the reachable objects instead.  But this is a one-time cost, probably not
      * worth complicating the code to speed just a little.
      */
-    gc_list_init(unreachable);
     move_unreachable(base, unreachable);  // gc_prev is pointer again
     validate_list(base, collecting_clear_unreachable_clear);
     validate_list(unreachable, collecting_set_unreachable_set);
@@ -1875,62 +1874,80 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         gcstate->generations[i].count = 0;
     }
 
-    PyGC_Head temp;
-    gc_list_init(&temp);
-
     int pending_space = other_space(gcstate->visited_space);
     int visited_space = gcstate->visited_space;
-    /* merge younger generations with one we are currently collecting */
-    if (generation == NUM_GENERATIONS-1) {
+
+    Py_ssize_t young_size = 0;
+    Py_ssize_t old_size = 0;
+
+    PyGC_Head temp_visited;
+    gc_list_init(&temp_visited);
+
+    if (generation == 1) {
+        // move alive objects to the VISITED space
+        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
         mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
         assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+    }
+    else if (generation == 2) {
+        if (reason != _Py_GC_REASON_HEAP) {
+            gc_list_merge(VISITED_HEAD(gcstate), &temp_visited);
+        }
 
+        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
+        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+    }
+
+    // fill increment
+    PyGC_Head *increment_target = NULL;
+    PyGC_Head increment;
+    gc_list_init(&increment);
+    if (generation < NUM_GENERATIONS - 1) {
+        Py_ssize_t increment_size = assess_increment_size(gcstate);
+        assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), pending_space));
+        steal_pending(PENDING_HEAD(gcstate), &increment, pending_space, visited_space, increment_size);
+        assert(0 == gc_list_validate_space(&increment, visited_space));
+        increment_target = VISITED_HEAD(gcstate);
+        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+    }
+
+    /* merge younger generations with one we are currently collecting */
+    if (generation == NUM_GENERATIONS-1) {
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 0), pending_space));
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), pending_space));
         assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), pending_space));
 
         gc_list_merge(GEN_HEAD(gcstate, 0), PENDING_HEAD(gcstate));
         gc_list_merge(GEN_HEAD(gcstate, 1), PENDING_HEAD(gcstate));
-        gc_list_set_space(PENDING_HEAD(gcstate), gcstate->visited_space);
+        young_size = gc_list_set_space(PENDING_HEAD(gcstate), gcstate->visited_space);
 
         assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), visited_space));
         assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
 
         if (reason == _Py_GC_REASON_HEAP) {
-            gc_list_merge(PENDING_HEAD(gcstate), &temp);
-            assert(0 == gc_list_size(PENDING_HEAD(gcstate)));
+            young = PENDING_HEAD(gcstate);
+            old = VISITED_HEAD(gcstate);
+            old_size = gc_list_size(old);
         }
         else {
-            gc_list_merge(PENDING_HEAD(gcstate), VISITED_HEAD(gcstate));
-
-            gc_list_merge(VISITED_HEAD(gcstate), &temp);
-            assert(0 == gc_list_size(VISITED_HEAD(gcstate)));
+            old_size = gc_list_size(&temp_visited);
+            gc_list_merge(PENDING_HEAD(gcstate), &temp_visited);
+            young = &temp_visited;
+            old = VISITED_HEAD(gcstate);
         }
-
-        young = &temp;
-        old = VISITED_HEAD(gcstate);
     }
     else if(generation == 1) {
-        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
-        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
 
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 0), pending_space));
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), pending_space));
 
         gc_list_merge(GEN_HEAD(gcstate, 0), GEN_HEAD(gcstate, 1));
-        assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), pending_space));
+        young_size = gc_list_set_space(GEN_HEAD(gcstate, generation), visited_space);
 
-        gc_list_set_space(GEN_HEAD(gcstate, 1), visited_space);
-
-        assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), visited_space));
+        assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, generation), visited_space));
         assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
 
-        gc_list_merge(GEN_HEAD(gcstate, generation), &temp);
-
-        Py_ssize_t increment_size = assess_increment_size(gcstate);
-        steal_pending(PENDING_HEAD(gcstate), &temp, pending_space, visited_space, increment_size);
-
-        young = &temp;
+        young = GEN_HEAD(gcstate, generation);
         old = VISITED_HEAD(gcstate);
     }
     else if(generation == 0) {
@@ -1940,24 +1957,23 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         visited_space = pending_space;
 
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, generation), pending_space));
-        gc_list_merge(GEN_HEAD(gcstate, generation), &temp);
+        assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, generation+1), pending_space));
 
-        Py_ssize_t increment_size = assess_increment_size(gcstate);
-        steal_pending(PENDING_HEAD(gcstate), &temp, pending_space, visited_space, increment_size);
-
-        young = &temp;
+        young = GEN_HEAD(gcstate, generation);
         old = GEN_HEAD(gcstate, generation+1);
     }
 
     validate_list(old, collecting_clear_unreachable_clear);
 
-    stats.candidates = deduce_unreachable(young, &unreachable);
+    gc_list_init(&unreachable);
+    stats.candidates += deduce_unreachable(young, &unreachable);
+    stats.candidates += deduce_unreachable(&increment, &unreachable);
 
     untrack_tuples(young);
     /* Move reachable objects to next generation. */
     if (generation < NUM_GENERATIONS-1) {
         if (generation == NUM_GENERATIONS - 2) {
-            gcstate->long_lived_pending += gc_list_size(young);
+            gcstate->long_lived_pending += young_size;
         }
     }
     else {
@@ -1969,13 +1985,17 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         // site; the cost is slightly more work for full collections on dicts
         // with only atomic values.
         gcstate->long_lived_pending = 0;
-        gcstate->long_lived_total = gc_list_size(young);
+        gcstate->long_lived_total = young_size + old_size;
 
         if (gc_list_is_empty(&gcstate->permanent_generation.head)) {
             gcstate->visited_space = other_space(gcstate->visited_space);
         }
     }
+
     gc_list_merge(young, old);
+    if (increment_target) {
+        gc_list_merge(&increment, increment_target);
+    }
 
     /* All objects in unreachable are trash, but objects reachable from
      * legacy finalizers (e.g. tp_del) can't safely be deleted.
@@ -2012,6 +2032,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
      * to 'finalize_garbage' and continue the collection with the
      * objects that are still unreachable */
     PyGC_Head final_unreachable;
+    gc_list_init(&final_unreachable);
     handle_resurrected_objects(&unreachable, &final_unreachable, old);
 
     /* Clear weakrefs to objects in the unreachable set.  No Python-level
