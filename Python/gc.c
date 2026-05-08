@@ -1882,6 +1882,9 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     int visited_space = gcstate->visited_space;
     /* merge younger generations with one we are currently collecting */
     if (generation == NUM_GENERATIONS-1) {
+        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
+        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 0), pending_space));
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), pending_space));
         assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), pending_space));
@@ -1899,11 +1902,11 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
 
         young = &temp;
         old = VISITED_HEAD(gcstate);
-
-        mark_alive(tstate, old, visited_space);
-        assert(0 == gc_list_validate_space(old, visited_space));
     }
     else if(generation == 1) {
+        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
+        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 0), pending_space));
         assert(0 == gc_list_validate_space(GEN_HEAD(gcstate, 1), pending_space));
 
