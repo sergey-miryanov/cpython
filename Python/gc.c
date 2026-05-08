@@ -1895,10 +1895,17 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
 
         assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), visited_space));
         assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
-        gc_list_merge(PENDING_HEAD(gcstate), VISITED_HEAD(gcstate));
 
-        gc_list_merge(VISITED_HEAD(gcstate), &temp);
-        assert(0 == gc_list_size(VISITED_HEAD(gcstate)));
+        if (reason == _Py_GC_REASON_HEAP) {
+            gc_list_merge(PENDING_HEAD(gcstate), &temp);
+            assert(0 == gc_list_size(PENDING_HEAD(gcstate)));
+        }
+        else {
+            gc_list_merge(PENDING_HEAD(gcstate), VISITED_HEAD(gcstate));
+
+            gc_list_merge(VISITED_HEAD(gcstate), &temp);
+            assert(0 == gc_list_size(VISITED_HEAD(gcstate)));
+        }
 
         young = &temp;
         old = VISITED_HEAD(gcstate);
