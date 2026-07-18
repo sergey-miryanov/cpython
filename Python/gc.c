@@ -1063,11 +1063,12 @@ handle_weakref_callbacks(PyGC_Head *unreachable, PyGC_Head *old, int visited_spa
  * `unreachable` is weakly referenced anymore.  See the comments above
  * handle_weakref_callbacks() for why these weakrefs need to be cleared.
  */
-static void
+static Py_ssize_t
 clear_weakrefs(PyGC_Head *unreachable)
 {
     PyGC_Head *gc;
     PyGC_Head *next;
+    Py_ssize_t count = 0;
 
     for (gc = GC_NEXT(unreachable); gc != unreachable; gc = next) {
         PyWeakReference **wrlist;
@@ -1105,8 +1106,11 @@ clear_weakrefs(PyGC_Head *unreachable)
             _PyObject_ASSERT((PyObject *)wr, wr->wr_object == op);
             _PyWeakref_ClearRef(wr);
             _PyObject_ASSERT((PyObject *)wr, wr->wr_object == Py_None);
+            count += 1;
         }
     }
+
+    return count;
 }
 
 static void
@@ -1150,7 +1154,7 @@ handle_legacy_finalizers(PyThreadState *tstate,
  * Note that this may remove some (or even all) of the objects from the
  * list, due to refcounts falling to 0.
  */
-static void
+static Py_ssize_t
 finalize_garbage(PyThreadState *tstate, PyGC_Head *collectable)
 {
     destructor finalize;
@@ -1166,6 +1170,7 @@ finalize_garbage(PyThreadState *tstate, PyGC_Head *collectable)
      */
     gc_list_init(&seen);
 
+    Py_ssize_t count = 0;
     while (!gc_list_is_empty(collectable)) {
         PyGC_Head *gc = GC_NEXT(collectable);
         PyObject *op = FROM_GC(gc);
@@ -1178,21 +1183,24 @@ finalize_garbage(PyThreadState *tstate, PyGC_Head *collectable)
             finalize(op);
             assert(!_PyErr_Occurred(tstate));
             Py_DECREF(op);
+            count += 1;
         }
     }
     gc_list_merge(&seen, collectable);
+    return count;
 }
 
 /* Break reference cycles by clearing the containers involved.  This is
  * tricky business as the lists can be changing and we don't know which
  * objects may be freed.  It is possible I screwed something up here.
  */
-static void
+static Py_ssize_t
 delete_garbage(PyThreadState *tstate, GCState *gcstate,
                PyGC_Head *collectable, PyGC_Head *old)
 {
     assert(!_PyErr_Occurred(tstate));
 
+    Py_ssize_t count = 0;
     while (!gc_list_is_empty(collectable)) {
         PyGC_Head *gc = GC_NEXT(collectable);
         PyObject *op = FROM_GC(gc);
@@ -1223,7 +1231,12 @@ delete_garbage(PyThreadState *tstate, GCState *gcstate,
             gc_clear_collecting(gc);
             gc_list_move(gc, old);
         }
+        else {
+            // how many object were deleted during clearing
+            count += 1;
+        }
     }
+    return count;
 }
 
 
@@ -1605,6 +1618,11 @@ mark_stacks(PyInterpreterState *interp, PyGC_Head *reachable, int visited_space)
                 PyObject *op = PyStackRef_AsPyObjectBorrow(*sp);
                 objects_marked += move_to_reachable(op, reachable, visited_space);
             }
+            if (frame->visited) {
+                // If this frame has already been visited, then the lower frames
+                // will have already been visited and will not have changed
+                break;
+            }
             frame->visited = 1;
             frame = frame->previous;
         }
@@ -1637,6 +1655,8 @@ mark_global_roots(PyInterpreterState *interp, PyGC_Head *reachable, int visited_
 static Py_ssize_t
 mark_alive(PyThreadState *tstate, PyGC_Head *visited, int visited_space)
 {
+    assert(0 == gc_list_validate_space(visited, visited_space));
+
     // TO DO -- Make this incremental
     PyGC_Head reachable;
     gc_list_init(&reachable);
@@ -1659,7 +1679,7 @@ assess_increment_size(GCState *gcstate)
     }
 
     struct gc_generation *generations = gcstate->generations;
-    Py_ssize_t total_steps = generations[0].threshold * generations[1].threshold;
+    Py_ssize_t total_steps = generations[1].threshold * generations[2].threshold;
     Py_ssize_t steps = total_steps - gcstate->step;
     if (steps <= 0) {
         steps = 2;
@@ -1671,7 +1691,7 @@ assess_increment_size(GCState *gcstate)
     }
 
     size_t fraction = count / steps;
-    size_t max_fraction = generations[0].count * 2;
+    size_t max_fraction = generations[0].threshold * 2;
     if (fraction > max_fraction) {
         fraction = max_fraction;
     }
@@ -1786,13 +1806,36 @@ add_stats(GCState *gcstate, int gen, struct gc_generation_stats *stats)
 
     cur_stats->duration += stats->duration;
     cur_stats->heap_size = stats->heap_size;
+
+    cur_stats->increment_size += stats->increment_size;
+    cur_stats->alive_size += stats->alive_size;
+    cur_stats->finalized_garbage_count += stats->finalized_garbage_count;
+    cur_stats->clear_weakrefs_count += stats->clear_weakrefs_count;
+    cur_stats->deleted_garbage_count += stats->deleted_garbage_count;
+
+    cur_stats->ts_mark_alive_start = stats->ts_mark_alive_start;
+    cur_stats->ts_mark_alive_stop = stats->ts_mark_alive_stop;
+    cur_stats->ts_fill_increment_start = stats->ts_fill_increment_start;
+    cur_stats->ts_fill_increment_stop = stats->ts_fill_increment_stop;
+    cur_stats->ts_deduce_unreachable_start = stats->ts_deduce_unreachable_start;
+    cur_stats->ts_deduce_unreachable_stop = stats->ts_deduce_unreachable_stop;
+
+    cur_stats->ts_handle_weakref_callbacks_start = stats->ts_handle_weakref_callbacks_start;
+    cur_stats->ts_handle_weakref_callbacks_stop = stats->ts_handle_weakref_callbacks_stop;
+    cur_stats->ts_finalize_garbage_stop = stats->ts_finalize_garbage_stop;
+    cur_stats->ts_handle_resurrected_stop = stats->ts_handle_resurrected_stop;
+    cur_stats->ts_clear_weakrefs_stop = stats->ts_clear_weakrefs_stop;
+
+    cur_stats->ts_delete_garbage_start = stats->ts_delete_garbage_start;
+    cur_stats->ts_delete_garbage_stop = stats->ts_delete_garbage_stop;
+
     /* Publish ts_stop last so remote readers do not select a partially
        updated stats record as the latest collection. */
     cur_stats->ts_stop = stats->ts_stop;
 }
 
 static void
-steal_pending(PyGC_Head *pending, PyGC_Head *visited, int pending_space, int visited_space, Py_ssize_t increment_size)
+fill_increment(PyGC_Head *pending, PyGC_Head *increment, int pending_space, int visited_space, Py_ssize_t increment_size)
 {
     assert(0 == gc_list_validate_space(pending, pending_space));
 
@@ -1803,13 +1846,13 @@ steal_pending(PyGC_Head *pending, PyGC_Head *visited, int pending_space, int vis
         PyGC_Head *gc = GC_NEXT(pending);
         assert(!_Py_IsImmortal(FROM_GC(gc)));
 
-        gc_list_move(gc, visited);
+        gc_list_move(gc, increment);
         gc_set_old_space(gc, visited_space);
         increment_size -= 1;
-        increment_size -= expand_region_transitively_reachable(gc, visited, visited_space);
+        increment_size -= expand_region_transitively_reachable(gc, increment, visited_space);
     }
 
-    assert(0 == gc_list_validate_space(visited, visited_space));
+    assert(0 == gc_list_validate_space(increment, visited_space));
 }
 
 /* This is the main function.  Read this to understand how the
@@ -1895,32 +1938,26 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     PyGC_Head temp_visited;
     gc_list_init(&temp_visited);
 
-    if (generation == 1) {
-        // move alive objects to the VISITED space
-        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
-        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
-        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
-    }
-    else if (generation == 2) {
-        if (reason != _Py_GC_REASON_HEAP) {
+    // move alive objects to the VISITED space
+    if (generation > 0) {
+        if (generation == 2 && reason != _Py_GC_REASON_HEAP) {
             gc_list_merge(VISITED_HEAD(gcstate), &temp_visited);
         }
 
-        mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
-        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+        (void)PyTime_PerfCounterRaw(&stats.ts_mark_alive_start);
+        stats.alive_size = mark_alive(tstate, VISITED_HEAD(gcstate), visited_space);
+        (void)PyTime_PerfCounterRaw(&stats.ts_mark_alive_stop);
     }
 
     // fill increment
-    PyGC_Head *increment_target = NULL;
     PyGC_Head increment;
     gc_list_init(&increment);
-    if (generation < NUM_GENERATIONS - 1) {
-        Py_ssize_t increment_size = assess_increment_size(gcstate);
-        assert(0 == gc_list_validate_space(PENDING_HEAD(gcstate), pending_space));
-        steal_pending(PENDING_HEAD(gcstate), &increment, pending_space, visited_space, increment_size);
-        assert(0 == gc_list_validate_space(&increment, visited_space));
-        increment_target = VISITED_HEAD(gcstate);
-        assert(0 == gc_list_validate_space(VISITED_HEAD(gcstate), visited_space));
+    if (generation == 1) {
+        stats.increment_size = assess_increment_size(gcstate);
+
+        (void)PyTime_PerfCounterRaw(&stats.ts_fill_increment_start);
+        fill_increment(PENDING_HEAD(gcstate), &increment, pending_space, visited_space, stats.increment_size);
+        (void)PyTime_PerfCounterRaw(&stats.ts_fill_increment_stop);
     }
 
     /* merge younger generations with one we are currently collecting */
@@ -1978,11 +2015,19 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     validate_list(old, collecting_clear_unreachable_clear);
 
     gc_list_init(&unreachable);
+    (void)PyTime_PerfCounterRaw(&stats.ts_deduce_unreachable_start);
     stats.candidates += deduce_unreachable(young, &unreachable);
     stats.candidates += deduce_unreachable(&increment, &unreachable);
+    (void)PyTime_PerfCounterRaw(&stats.ts_deduce_unreachable_stop);
 
     untrack_tuples(young);
+
     /* Move reachable objects to next generation. */
+    gc_list_merge(young, old);
+    if (!gc_list_is_empty(&increment)) {
+        gc_list_merge(&increment, VISITED_HEAD(gcstate));
+    }
+
     if (generation < NUM_GENERATIONS-1) {
         if (generation == NUM_GENERATIONS - 2) {
             gcstate->long_lived_pending += young_size;
@@ -2004,11 +2049,6 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         if (gc_list_is_empty(&gcstate->permanent_generation.head)) {
             gcstate->visited_space = other_space(gcstate->visited_space);
         }
-    }
-
-    gc_list_merge(young, old);
-    if (increment_target) {
-        gc_list_merge(&increment, increment_target);
     }
 
     /* All objects in unreachable are trash, but objects reachable from
@@ -2035,12 +2075,15 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     }
 
     /* Clear weakrefs and invoke callbacks as necessary. */
+    (void)PyTime_PerfCounterRaw(&stats.ts_handle_weakref_callbacks_start);
     stats.collected += handle_weakref_callbacks(&unreachable, old, visited_space);
     validate_list(old, collecting_clear_unreachable_clear);
     validate_list(&unreachable, collecting_set_unreachable_clear);
+    (void)PyTime_PerfCounterRaw(&stats.ts_handle_weakref_callbacks_stop);
 
     /* Call tp_finalize on objects which have one. */
-    finalize_garbage(tstate, &unreachable);
+    stats.finalized_garbage_count = finalize_garbage(tstate, &unreachable);
+    (void)PyTime_PerfCounterRaw(&stats.ts_finalize_garbage_stop);
 
     /* Handle any objects that may have resurrected after the call
      * to 'finalize_garbage' and continue the collection with the
@@ -2048,6 +2091,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     PyGC_Head final_unreachable;
     gc_list_init(&final_unreachable);
     handle_resurrected_objects(&unreachable, &final_unreachable, old);
+    (void)PyTime_PerfCounterRaw(&stats.ts_handle_resurrected_stop);
 
     /* Clear weakrefs to objects in the unreachable set.  No Python-level
      * code must be allowed to access those unreachable objects.  During
@@ -2055,14 +2099,17 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
      * and create new weakrefs.  If those weakrefs were not cleared, they
      * could reveal unreachable objects.  Callbacks are not executed.
      */
-    clear_weakrefs(&final_unreachable);
+    stats.clear_weakrefs_count = clear_weakrefs(&final_unreachable);
+    (void)PyTime_PerfCounterRaw(&stats.ts_clear_weakrefs_stop);
 
     /* Call tp_clear on objects in the final_unreachable set.  This will cause
     * the reference cycles to be broken.  It may also cause some objects
     * in finalizers to be freed.
     */
     stats.collected += gc_list_size(&final_unreachable);
-    delete_garbage(tstate, gcstate, &final_unreachable, old);
+    (void)PyTime_PerfCounterRaw(&stats.ts_delete_garbage_start);
+    stats.deleted_garbage_count = delete_garbage(tstate, gcstate, &final_unreachable, old);
+    (void)PyTime_PerfCounterRaw(&stats.ts_delete_garbage_stop);
 
     /* Collect statistics on uncollectable objects found and print
      * debugging information. */

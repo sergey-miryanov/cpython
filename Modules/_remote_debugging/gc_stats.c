@@ -57,6 +57,28 @@ read_gc_stats(struct gc_stats *stats, int64_t iid, PyObject *result,
 
             SET_FIELD(PyFloat_FromDouble, items->duration);
 
+            SET_FIELD(PyLong_FromSsize_t, items->increment_size);
+            SET_FIELD(PyLong_FromSsize_t, items->alive_size);
+            SET_FIELD(PyLong_FromSsize_t, items->finalized_garbage_count);
+            SET_FIELD(PyLong_FromSsize_t, items->clear_weakrefs_count);
+            SET_FIELD(PyLong_FromSsize_t, items->deleted_garbage_count);
+
+            SET_FIELD(PyLong_FromInt64, items->ts_mark_alive_start);
+            SET_FIELD(PyLong_FromInt64, items->ts_mark_alive_stop);
+            SET_FIELD(PyLong_FromInt64, items->ts_fill_increment_start);
+            SET_FIELD(PyLong_FromInt64, items->ts_fill_increment_stop);
+            SET_FIELD(PyLong_FromInt64, items->ts_deduce_unreachable_start);
+            SET_FIELD(PyLong_FromInt64, items->ts_deduce_unreachable_stop);
+
+            SET_FIELD(PyLong_FromInt64, items->ts_handle_weakref_callbacks_start);
+            SET_FIELD(PyLong_FromInt64, items->ts_handle_weakref_callbacks_stop);
+            SET_FIELD(PyLong_FromInt64, items->ts_finalize_garbage_stop);
+            SET_FIELD(PyLong_FromInt64, items->ts_handle_resurrected_stop);
+            SET_FIELD(PyLong_FromInt64, items->ts_clear_weakrefs_stop);
+
+            SET_FIELD(PyLong_FromInt64, items->ts_delete_garbage_start);
+            SET_FIELD(PyLong_FromInt64, items->ts_delete_garbage_stop);
+
             int rc = PyList_Append(result, item);
             Py_CLEAR(item);
             if (rc < 0) {

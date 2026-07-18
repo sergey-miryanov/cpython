@@ -145,6 +145,29 @@ static PyStructSequence_Field GCStatsInfo_fields[] = {
     {"candidates", "Total objects considered and traversed"},
     {"heap_size", "Number of live objects"},
     {"duration", "Total collection time, in seconds"},
+
+    {"increment_size", "Total collection time, in seconds"},
+    {"alive_size", "Total collection time, in seconds"},
+    {"finalized_garbage_count", "Total collection time, in seconds"},
+    {"clear_weakrefs_count", "Total collection time, in seconds"},
+    {"deleted_garbage_count", "Total collection time, in seconds"},
+
+    {"ts_mark_alive_start", "Total collection time, in seconds"},
+    {"ts_mark_alive_stop", "Total collection time, in seconds"},
+    {"ts_fill_increment_start", "Total collection time, in seconds"},
+    {"ts_fill_increment_stop", "Total collection time, in seconds"},
+    {"ts_deduce_unreachable_start", "Total collection time, in seconds"},
+    {"ts_deduce_unreachable_stop", "Total collection time, in seconds"},
+
+    {"ts_handle_weakref_callbacks_start", "Total collection time, in seconds"},
+    {"ts_handle_weakref_callbacks_stop", "Total collection time, in seconds"},
+    {"ts_finalize_garbage_stop", "Total collection time, in seconds"},
+    {"ts_handle_resurrected_stop", "Total collection time, in seconds"},
+    {"ts_clear_weakrefs_stop", "Total collection time, in seconds"},
+
+    {"ts_delete_garbage_start", "Total collection time, in seconds"},
+    {"ts_delete_garbage_stop", "Total collection time, in seconds"},
+
     {NULL}
 };
 
@@ -152,7 +175,7 @@ PyStructSequence_Desc GCStatsInfo_desc = {
     "_remote_debugging.GCStatsInfo",
     "Information about a garbage collector stats sample",
     GCStatsInfo_fields,
-    10
+    28
 };
 
 /* ============================================================================

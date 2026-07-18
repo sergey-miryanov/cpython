@@ -193,6 +193,31 @@ struct gc_generation_stats {
     double duration;
     /* heap_size on the start of the collection */
     Py_ssize_t heap_size;
+
+    Py_ssize_t increment_size;
+    Py_ssize_t alive_size;
+    Py_ssize_t finalized_garbage_count;
+    Py_ssize_t clear_weakrefs_count;
+    Py_ssize_t deleted_garbage_count;
+
+    PyTime_t ts_mark_alive_start;
+    PyTime_t ts_mark_alive_stop;
+
+    PyTime_t ts_fill_increment_start;
+    PyTime_t ts_fill_increment_stop;
+
+    PyTime_t ts_deduce_unreachable_start;
+    PyTime_t ts_deduce_unreachable_stop;
+
+    PyTime_t ts_handle_weakref_callbacks_start;
+    PyTime_t ts_handle_weakref_callbacks_stop;
+    PyTime_t ts_finalize_garbage_stop;
+    PyTime_t ts_handle_resurrected_stop;
+    PyTime_t ts_clear_weakrefs_stop;
+
+    PyTime_t ts_delete_garbage_start;
+    PyTime_t ts_delete_garbage_stop;
+
 };
 
 #ifdef Py_GIL_DISABLED

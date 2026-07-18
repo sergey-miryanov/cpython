@@ -22,7 +22,22 @@ except ImportError:
 
 GC_STATS_FIELDS = (
     "gen", "iid", "ts_start", "ts_stop", "collections", "collected",
-    "uncollectable", "candidates", "heap_size", "duration")
+    "uncollectable", "candidates", "heap_size", "duration",
+    "increment_size", "alive_size",
+    "finalized_garbage_count", "clear_weakrefs_count",
+    "deleted_garbage_count",
+
+    "ts_mark_alive_start", "ts_mark_alive_stop",
+    "ts_fill_increment_start", "ts_fill_increment_stop",
+    "ts_deduce_unreachable_start", "ts_deduce_unreachable_stop",
+
+    "ts_handle_weakref_callbacks_start", "ts_handle_weakref_callbacks_stop",
+    "ts_finalize_garbage_stop",
+    "ts_handle_resurrected_stop",
+    "ts_clear_weakrefs_stop",
+
+    "ts_delete_garbage_start", "ts_delete_garbage_stop",
+    )
 
 
 def get_interpreter_identifiers(gc_stats) -> tuple[int,...]:
