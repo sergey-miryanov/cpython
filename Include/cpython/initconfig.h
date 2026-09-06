@@ -242,6 +242,9 @@ typedef struct PyConfig {
     // PYTHON_PRESITE=package.module or -X presite=package.module
     wchar_t *run_presite;
 #endif
+#ifndef Py_GIL_DISABLED
+    int gc;
+#endif
 } PyConfig;
 
 PyAPI_FUNC(void) PyConfig_InitPythonConfig(PyConfig *config);
