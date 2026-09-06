@@ -218,6 +218,8 @@ static const PyConfigSpec PYCONFIG_SPEC[] = {
     SPEC(pythonpath_env, WSTR_OPT, INIT_ONLY, NO_SYS, NO_GLOBAL),
     SPEC(sys_path_0, WSTR_OPT, INIT_ONLY, NO_SYS, NO_GLOBAL),
 
+    SPEC(gc, INT, READ_ONLY, NO_SYS, NO_GLOBAL),
+
     // Array terminator
     {NULL, 0, 0, 0, NO_SYS},
 };
@@ -610,6 +612,9 @@ static const char usage_envvars[] =
 "#E{PYTHONWARNDEFAULTENCODING}: enable opt-in EncodingWarning for 'encoding=None'\n"
 "                  (#S{-X} #e{warn_default_encoding})\n"
 "#E{PYTHONWARNINGS}  : warning control (#S{-W})\n"
+#ifndef Py_GIL_DISABLED
+"#E{PYTHON_GC}       : control GC type (-X gc)\n"
+#endif
 ;
 
 
@@ -1106,6 +1111,10 @@ config_check_consistency(const PyConfig *config)
 #ifdef Py_STATS
     assert(config->_pystats >= 0);
 #endif
+#ifndef Py_GIL_DISABLED
+    // gc can be 0(legacy) or 1(incremental)
+    assert(config->gc >= 0 && config->gc <= 1);
+#endif
     return 1;
 }
 #endif
@@ -1221,6 +1230,9 @@ _PyConfig_InitCompatConfig(PyConfig *config)
 #ifdef Py_GIL_DISABLED
     config->enable_gil = _PyConfig_GIL_DEFAULT;
     config->tlbc_enabled = 1;
+#endif
+#ifndef Py_GIL_DISABLED
+    config->gc = -1;
 #endif
 }
 
@@ -2492,6 +2504,45 @@ config_init_pathconfig_warnings(PyConfig *config)
     return _PyStatus_OK();
 }
 
+#ifndef Py_GIL_DISABLED
+static PyStatus
+config_init_gc(PyConfig *config)
+{
+    int gc = -1;
+
+    const char *env = config_get_env(config, "PYTHON_GC");
+    if (env) {
+        if (strcmp(env, "legacy") == 0) {
+            gc = 0;
+        }
+        else if (strcmp(env, "incremental") == 0) {
+            gc = 1;
+        }
+        else {
+            return _PyStatus_ERR("PYTHON_GC: invalid value; "
+                                 "expected 'legacy', 'incremental'");
+        }
+        config->gc = gc;
+    }
+
+    const wchar_t *x_value = config_get_xoption_value(config, L"gc");
+    if (x_value) {
+        if (wcscmp(x_value, L"legacy") == 0) {
+            gc = 0;
+        }
+        else if (wcscmp(x_value, L"incremental") == 0) {
+            gc = 1;
+        }
+        else {
+            return _PyStatus_ERR("-X gc: invalid value; "
+                                 "expected 'legacy', 'incremental'");
+        }
+        config->gc = gc;
+    }
+    return _PyStatus_OK();
+}
+#endif
+
 static PyStatus
 config_read_complex_options(PyConfig *config)
 {
@@ -2592,6 +2643,15 @@ config_read_complex_options(PyConfig *config)
     if (_PyStatus_EXCEPTION(status)) {
         return status;
     }
+
+#ifndef Py_GIL_DISABLED
+    if (config->gc < 0) {
+        status = config_init_gc(config);
+        if (_PyStatus_EXCEPTION(status)) {
+            return status;
+        }
+    }
+#endif
 
     return _PyStatus_OK();
 }
@@ -2966,6 +3026,12 @@ config_read(PyConfig *config, int compute_path_config)
     if (config->parse_argv == 1) {
         config->parse_argv = 2;
     }
+
+#ifndef Py_GIL_DISABLED
+    if (config->gc < 0) {
+        config->gc = 1; // incremental by default
+    }
+#endif
 
     return _PyStatus_OK();
 }

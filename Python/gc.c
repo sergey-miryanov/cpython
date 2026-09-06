@@ -135,15 +135,12 @@ _PyGC_Init(PyInterpreterState *interp)
 {
     GCState *gcstate = &interp->gc;
 
-    const wchar_t *option = _Py_get_xoption(&interp->config.xoptions, L"gc");
-    if (option != NULL) {
-        if (wcscmp(option, L"gc=legacy") == 0) {
-            gcstate->implementation = GC_IMPL_LEGACY;
-            gcstate->young.aging_spaces = 1;
-        }
-        else if (wcscmp(option, L"gc=incremental") != 0) {
-            return _PyStatus_ERR("-X gc must be 'legacy' or 'incremental'");
-        }
+    if (interp->config.gc == 0) {
+        gcstate->implementation = GC_IMPL_LEGACY;
+        gcstate->young.aging_spaces = 1;
+    }
+    else if (interp->config.gc == 1) {
+        gcstate->implementation = GC_IMPL_INCREMENTAL;
     }
 
     gcstate->young.aging = PyMem_RawCalloc(
