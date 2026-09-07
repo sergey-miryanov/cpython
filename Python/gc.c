@@ -1620,6 +1620,15 @@ add_stats(GCState *gcstate, int gen, struct gc_generation_stats *stats)
     cur_stats->collected += stats->collected;
     cur_stats->uncollectable += stats->uncollectable;
     cur_stats->candidates += stats->candidates;
+    cur_stats->old_work = stats->old_work;
+    cur_stats->auto_collect = stats->auto_collect;
+    cur_stats->aging_threshold = stats->aging_threshold;
+    cur_stats->aging_spaces = stats->aging_spaces;
+    cur_stats->aging_next = stats->aging_next;
+    cur_stats->survivor_count = stats->survivor_count;
+    cur_stats->increment_size = stats->increment_size;
+    cur_stats->heap_size_start = stats->heap_size_start;
+    cur_stats->heap_size_stop = stats->heap_size_stop;
 
     cur_stats->duration += stats->duration;
     if (stats->duration > cur_stats->max_pause) {
@@ -1698,7 +1707,7 @@ gc_collect_legacy_generation0(PyThreadState *tstate,
     gcstate->young.available_memory =
         (Py_ssize_t)gcstate->young.threshold * _PyGC_NURSERY_SIZE_UNIT;
     gcstate->old[0].count++;
-    (void)gc_collect_region(tstate, &gcstate->young.nursery,
+    stats->survivor_count = gc_collect_region(tstate, &gcstate->young.nursery,
                             &gcstate->young.aging[0], stats);
 }
 
@@ -1712,9 +1721,9 @@ gc_collect_legacy_generation1(PyThreadState *tstate,
     gcstate->old[0].count = 0;
     gcstate->old[1].count++;
     gc_list_merge(&gcstate->young.nursery, &gcstate->young.aging[0]);
-    Py_ssize_t survivors = gc_collect_region(
+    stats->survivor_count = gc_collect_region(
         tstate, &gcstate->young.aging[0], &gcstate->old[0].head, stats);
-    gcstate->long_lived_pending += survivors;
+    gcstate->long_lived_pending += stats->survivor_count;
 }
 
 static void
@@ -1728,10 +1737,10 @@ gc_collect_legacy_generation2(PyThreadState *tstate,
     gcstate->old[1].count = 0;
     gc_list_merge(&gcstate->young.nursery, &gcstate->old[0].head);
     gc_list_merge(&gcstate->young.aging[0], &gcstate->old[0].head);
-    Py_ssize_t survivors = gc_collect_region(
+    stats->survivor_count = gc_collect_region(
         tstate, &gcstate->old[0].head, &gcstate->old[0].head, stats);
     gcstate->long_lived_pending = 0;
-    gcstate->long_lived_total = survivors;
+    gcstate->long_lived_total = stats->survivor_count;
     _PyGC_ClearAllFreeLists(tstate->interp);
 }
 
@@ -1777,8 +1786,8 @@ gc_collect_incremental_young(PyThreadState *tstate,
     if (gcstate->visited_space == 1) {
         gc_flip_old_space(collecting);
     }
-    Py_ssize_t survivors = gc_collect_region(tstate, collecting, old, stats);
-    gc_add_old_work(gcstate, survivors);
+    stats->survivor_count = gc_collect_region(tstate, collecting, old, stats);
+    gc_add_old_work(gcstate, stats->survivor_count);
 
     gc_list_merge(&gcstate->young.nursery, collecting);
 }
@@ -1803,7 +1812,7 @@ gc_collect_incremental_full(PyThreadState *tstate,
     gcstate->young.next = 0;
     gcstate->old[0].count = gcstate->old[1].count = 0;
     gcstate->old_work = 0;
-    (void)gc_collect_region(
+    stats->survivor_count = gc_collect_region(
         tstate, &gcstate->old[0].head, &gcstate->old[0].head, stats);
     _PyGC_ClearAllFreeLists(tstate->interp);
 }
@@ -1834,8 +1843,9 @@ gc_collect_incremental_old(PyThreadState *tstate,
         increment_size++;
         increment_size += expand_incremental_region(
             gcstate, &increment, first);
-        (void)gc_collect_region(tstate, &increment, visited, stats);
+        stats->survivor_count += gc_collect_region(tstate, &increment, visited, stats);
     }
+    stats->increment_size = increment_size;
 
     if (increment_size > 0) {
        gcstate->old_work -= increment_size;
@@ -1867,7 +1877,9 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     }
     gcstate->frame = tstate->current_frame;
 
+    bool auto_collect = false;
     if (generation == GENERATION_AUTO) {
+        auto_collect = true;
         // Select the oldest generation that needs collecting.
         generation = gc_select_generation(gcstate);
         if (generation < 0) {
@@ -1892,6 +1904,12 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     GC_STAT_ADD(generation, collections, 1);
 
     struct gc_generation_stats stats = { 0 };
+    stats.old_work = gcstate->old_work;
+    stats.auto_collect = auto_collect;
+    stats.aging_threshold = gcstate->young.aging_threshold;
+    stats.aging_spaces = gcstate->young.aging_spaces;
+    stats.aging_next = gcstate->young.next;
+    stats.heap_size_start = gcstate->heap_size;
     if (reason != _Py_GC_REASON_SHUTDOWN) {
         invoke_gc_callback(tstate, "start", generation, &stats);
     }
@@ -1952,6 +1970,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
         }
     }
 
+    stats.heap_size_stop = gcstate->heap_size;
     /* Update stats */
     add_stats(gcstate, generation, &stats);
     GC_STAT_ADD(generation, objects_collected, stats.collected);
@@ -2509,6 +2528,8 @@ PyObject_GC_Del(void *op)
     PyGC_Head *g = AS_GC(op);
     if (_PyObject_GC_IS_TRACKED(op)) {
         gc_list_remove(g);
+        GCState *gcstate = get_gc_state();
+        gcstate->heap_size--;
 #ifdef Py_DEBUG
         PyObject *exc = PyErr_GetRaisedException();
         if (PyErr_WarnExplicitFormat(PyExc_ResourceWarning, "gc", 0,

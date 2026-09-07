@@ -143,6 +143,16 @@ static PyStructSequence_Field GCStatsInfo_fields[] = {
     {"collected", "Total number of collected objects"},
     {"uncollectable", "Total number of uncollectable objects"},
     {"candidates", "Total objects considered and traversed"},
+    {"heap_size", "Total objects considered and traversed"},
+    {"heap_size_stop", "Total objects considered and traversed"},
+    {"old_work", "Total objects considered and traversed"},
+    {"auto_collect", "Total objects considered and traversed"},
+    {"aging_threshold", "Total objects considered and traversed"},
+    {"aging_spaces", "Total objects considered and traversed"},
+    {"aging_next", "Total objects considered and traversed"},
+    {"survivor_count", "Total objects considered and traversed"},
+    {"increment_size", "Total objects considered and traversed"},
+
     {"duration", "Total collection time, in seconds"},
     {"max_pause", "Maximum collection pause, in seconds"},
     {NULL}
@@ -152,7 +162,7 @@ PyStructSequence_Desc GCStatsInfo_desc = {
     "_remote_debugging.GCStatsInfo",
     "Information about a garbage collector stats sample",
     GCStatsInfo_fields,
-    10
+    19
 };
 
 /* ============================================================================

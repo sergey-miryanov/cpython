@@ -210,8 +210,19 @@ struct gc_generation_stats {
     Py_ssize_t candidates;
     // Total duration of the collection in seconds:
     double duration;
+    /* heap_size on the start and stop of the collection */
+    Py_ssize_t heap_size_start;
+    Py_ssize_t heap_size_stop;
     // Maximum duration of a single collection in seconds:
     double max_pause;
+    // old_work on the start of the collection
+    Py_ssize_t old_work;
+    Py_ssize_t auto_collect;
+    Py_ssize_t aging_threshold;
+    Py_ssize_t aging_spaces;
+    Py_ssize_t aging_next;
+    Py_ssize_t survivor_count;
+    Py_ssize_t increment_size;
 };
 
 #ifdef Py_GIL_DISABLED
@@ -272,6 +283,9 @@ struct _gc_runtime_state {
     /* a list of callbacks to be invoked when collection is performed */
     PyObject *callbacks;
 
+    /* The number of live objects. */
+    Py_ssize_t heap_size;
+
     /* This is the number of objects that survived the last full
        collection. It approximates the number of long lived objects
        tracked by the GC.
@@ -312,6 +326,7 @@ struct _gc_runtime_state {
         { .threshold = 10, }, \
         { .threshold = 10, }, \
     }, \
+    .heap_size = 0, \
     .old_work = -100000,
 #else
 #define GC_GENERATION_INIT \

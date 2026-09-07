@@ -239,6 +239,7 @@ static inline void _PyObject_GC_TRACK(
     _PyGCHead_SET_PREV(gc, last);
     _PyGCHead_SET_NEXT(gc, generation0);
     generation0->_gc_prev = (uintptr_t)gc;
+    gcstate->heap_size++;
 #endif
 }
 
@@ -273,6 +274,8 @@ static inline void _PyObject_GC_UNTRACK(
     _PyGCHead_SET_PREV(next, prev);
     gc->_gc_next = 0;
     gc->_gc_prev &= _PyGC_PREV_MASK_FINALIZED;
+    struct _gc_runtime_state *gcstate = &_PyInterpreterState_GET()->gc;
+    gcstate->heap_size--;
 #endif
 }
 
