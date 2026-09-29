@@ -22,7 +22,10 @@ except ImportError:
 
 GC_STATS_FIELDS = (
     "gen", "iid", "ts_start", "ts_stop", "collections", "collected",
-    "uncollectable", "candidates", "duration", "max_pause")
+    "uncollectable", "candidates", "heap_size", "heap_size_stop", "old_work",
+    "auto_collect", "aging_threshold", "aging_spaces", "aging_next",
+    "survivor_count", "increment_size",
+    "duration", "max_pause")
 
 
 def get_interpreter_identifiers(gc_stats) -> tuple[int,...]:

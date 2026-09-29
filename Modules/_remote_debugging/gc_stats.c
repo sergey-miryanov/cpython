@@ -53,6 +53,15 @@ read_gc_stats(struct gc_stats *stats, int64_t iid, PyObject *result,
             SET_FIELD(PyLong_FromSsize_t, items->collected);
             SET_FIELD(PyLong_FromSsize_t, items->uncollectable);
             SET_FIELD(PyLong_FromSsize_t, items->candidates);
+            SET_FIELD(PyLong_FromSsize_t, items->heap_size_start);
+            SET_FIELD(PyLong_FromSsize_t, items->heap_size_stop);
+            SET_FIELD(PyLong_FromSsize_t, items->old_work);
+            SET_FIELD(PyLong_FromSsize_t, items->auto_collect);
+            SET_FIELD(PyLong_FromSsize_t, items->aging_threshold);
+            SET_FIELD(PyLong_FromSsize_t, items->aging_spaces);
+            SET_FIELD(PyLong_FromSsize_t, items->aging_next);
+            SET_FIELD(PyLong_FromSsize_t, items->survivor_count);
+            SET_FIELD(PyLong_FromSsize_t, items->increment_size);
 
             SET_FIELD(PyFloat_FromDouble, items->duration);
             SET_FIELD(PyFloat_FromDouble, items->max_pause);
