@@ -223,6 +223,9 @@ struct gc_generation_stats {
     Py_ssize_t aging_next;
     Py_ssize_t survivor_count;
     Py_ssize_t increment_size;
+    Py_ssize_t threshold0;
+    Py_ssize_t threshold1;
+    Py_ssize_t threshold2;
 };
 
 #ifdef Py_GIL_DISABLED

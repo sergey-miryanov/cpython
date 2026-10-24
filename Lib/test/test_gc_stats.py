@@ -25,6 +25,7 @@ GC_STATS_FIELDS = (
     "uncollectable", "candidates", "heap_size", "heap_size_stop", "old_work",
     "auto_collect", "aging_threshold", "aging_spaces", "aging_next",
     "survivor_count", "increment_size",
+    "threshold0", "threshold1", "threshold2",
     "duration", "max_pause")
 
 

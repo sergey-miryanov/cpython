@@ -1717,6 +1717,9 @@ add_stats(GCState *gcstate, int gen, struct gc_generation_stats *stats)
     cur_stats->heap_size_start = stats->heap_size_start;
     cur_stats->heap_size_stop = stats->heap_size_stop;
 
+    cur_stats->threshold0 = stats->threshold0;
+    cur_stats->threshold1 = stats->threshold1;
+    cur_stats->threshold2 = stats->threshold2;
     cur_stats->duration += stats->duration;
     if (stats->duration > cur_stats->max_pause) {
         cur_stats->max_pause = stats->duration;
@@ -2033,6 +2036,9 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     stats.aging_spaces = gcstate->young.aging_spaces;
     stats.aging_next = gcstate->young.next;
     stats.heap_size_start = gcstate->heap_size;
+    stats.threshold0 = gcstate->young.threshold;
+    stats.threshold1 = gcstate->old[0].threshold;
+    stats.threshold2 = gcstate->old[1].threshold;
     if (reason != _Py_GC_REASON_SHUTDOWN) {
         invoke_gc_callback(tstate, "start", generation, &stats);
     }

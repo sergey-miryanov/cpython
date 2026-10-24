@@ -63,6 +63,9 @@ read_gc_stats(struct gc_stats *stats, int64_t iid, PyObject *result,
             SET_FIELD(PyLong_FromSsize_t, items->survivor_count);
             SET_FIELD(PyLong_FromSsize_t, items->increment_size);
 
+            SET_FIELD(PyLong_FromSsize_t, items->threshold0);
+            SET_FIELD(PyLong_FromSsize_t, items->threshold1);
+            SET_FIELD(PyLong_FromSsize_t, items->threshold2);
             SET_FIELD(PyFloat_FromDouble, items->duration);
             SET_FIELD(PyFloat_FromDouble, items->max_pause);
 
