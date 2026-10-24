@@ -153,6 +153,9 @@ static PyStructSequence_Field GCStatsInfo_fields[] = {
     {"survivor_count", "Total objects considered and traversed"},
     {"increment_size", "Total objects considered and traversed"},
 
+    {"threshold0", "Total objects considered and traversed"},
+    {"threshold1", "Total objects considered and traversed"},
+    {"threshold2", "Total objects considered and traversed"},
 
     {"reason", "Total objects considered and traversed"},
     {"gc_type", "Total objects considered and traversed"},
@@ -166,7 +169,7 @@ PyStructSequence_Desc GCStatsInfo_desc = {
     "_remote_debugging.GCStatsInfo",
     "Information about a garbage collector stats sample",
     GCStatsInfo_fields,
-    19
+    24
 };
 
 /* ============================================================================
