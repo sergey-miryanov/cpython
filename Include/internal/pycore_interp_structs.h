@@ -234,8 +234,8 @@ struct gc_generation_stats {
 #define GC_YOUNG_STATS_SIZE 1
 #define GC_OLD_STATS_SIZE 1
 #else
-#define GC_YOUNG_STATS_SIZE 11
-#define GC_OLD_STATS_SIZE 3
+#define GC_YOUNG_STATS_SIZE 32
+#define GC_OLD_STATS_SIZE 32
 #endif
 struct gc_young_stats_buffer {
     struct gc_generation_stats items[GC_YOUNG_STATS_SIZE];
