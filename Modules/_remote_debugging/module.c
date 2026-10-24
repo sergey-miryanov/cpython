@@ -153,6 +153,10 @@ static PyStructSequence_Field GCStatsInfo_fields[] = {
     {"survivor_count", "Total objects considered and traversed"},
     {"increment_size", "Total objects considered and traversed"},
 
+
+    {"reason", "Total objects considered and traversed"},
+    {"gc_type", "Total objects considered and traversed"},
+
     {"duration", "Total collection time, in seconds"},
     {"max_pause", "Maximum collection pause, in seconds"},
     {NULL}

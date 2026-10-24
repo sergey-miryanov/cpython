@@ -1720,10 +1720,15 @@ add_stats(GCState *gcstate, int gen, struct gc_generation_stats *stats)
     cur_stats->threshold0 = stats->threshold0;
     cur_stats->threshold1 = stats->threshold1;
     cur_stats->threshold2 = stats->threshold2;
+
+    cur_stats->reason = stats->reason;
+    cur_stats->gc_type = stats->gc_type;
+
     cur_stats->duration += stats->duration;
     if (stats->duration > cur_stats->max_pause) {
         cur_stats->max_pause = stats->duration;
     }
+
     /* Publish ts_stop last so remote readers do not select a partially
        updated stats record as the latest collection. */
     cur_stats->ts_stop = stats->ts_stop;
@@ -2039,6 +2044,14 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     stats.threshold0 = gcstate->young.threshold;
     stats.threshold1 = gcstate->old[0].threshold;
     stats.threshold2 = gcstate->old[1].threshold;
+    stats.reason = (int32_t)reason;
+    stats.gc_type = 0;
+    if (gcstate->implementation == GC_IMPL_LEGACY) {
+        stats.gc_type = 1;
+    }
+    else if (gcstate->implementation == GC_IMPL_INCREMENTAL) {
+        stats.gc_type = 2;
+    }
     if (reason != _Py_GC_REASON_SHUTDOWN) {
         invoke_gc_callback(tstate, "start", generation, &stats);
     }

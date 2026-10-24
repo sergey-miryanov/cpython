@@ -226,6 +226,8 @@ struct gc_generation_stats {
     Py_ssize_t threshold0;
     Py_ssize_t threshold1;
     Py_ssize_t threshold2;
+    int32_t reason;
+    int32_t gc_type; // 0 - old, 1 - legacy, 2 - incremental
 };
 
 #ifdef Py_GIL_DISABLED
