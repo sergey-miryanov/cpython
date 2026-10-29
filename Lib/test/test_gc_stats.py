@@ -26,7 +26,7 @@ GC_STATS_FIELDS = (
     "auto_collect", "aging_threshold", "aging_spaces", "aging_next",
     "survivor_count", "increment_size",
     "threshold0", "threshold1", "threshold2",
-    "reason", "gc_type",
+    "reason", "gc_type", "allocated",
     "duration", "max_pause")
 
 

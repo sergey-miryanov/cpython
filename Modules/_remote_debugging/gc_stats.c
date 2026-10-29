@@ -70,6 +70,8 @@ read_gc_stats(struct gc_stats *stats, int64_t iid, PyObject *result,
             SET_FIELD(PyLong_FromInt32, items->reason);
             SET_FIELD(PyLong_FromInt32, items->gc_type);
 
+            SET_FIELD(PyLong_FromUInt64, items->allocated);
+
             SET_FIELD(PyFloat_FromDouble, items->duration);
             SET_FIELD(PyFloat_FromDouble, items->max_pause);
 

@@ -228,6 +228,7 @@ struct gc_generation_stats {
     Py_ssize_t threshold2;
     int32_t reason;
     int32_t gc_type; // 0 - old, 1 - legacy, 2 - incremental
+    uint64_t allocated;
 };
 
 #ifdef Py_GIL_DISABLED
@@ -316,6 +317,7 @@ struct _gc_runtime_state {
     int visited_space;
     int next_gen;
     Py_ssize_t old_work;
+    uint64_t allocated;
 #endif
 };
 

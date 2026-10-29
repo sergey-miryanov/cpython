@@ -1729,6 +1729,8 @@ add_stats(GCState *gcstate, int gen, struct gc_generation_stats *stats)
         cur_stats->max_pause = stats->duration;
     }
 
+    cur_stats->allocated = stats->allocated;
+
     /* Publish ts_stop last so remote readers do not select a partially
        updated stats record as the latest collection. */
     cur_stats->ts_stop = stats->ts_stop;
@@ -2045,6 +2047,7 @@ gc_collect_main(PyThreadState *tstate, int generation, _PyGC_Reason reason)
     stats.threshold1 = gcstate->old[0].threshold;
     stats.threshold2 = gcstate->old[1].threshold;
     stats.reason = (int32_t)reason;
+    stats.allocated = gcstate->allocated;
     stats.gc_type = 0;
     if (gcstate->implementation == GC_IMPL_LEGACY) {
         stats.gc_type = 1;
@@ -2560,6 +2563,7 @@ _PyObject_GC_Link(PyObject *op, size_t size)
     gc->_gc_prev = 0;
 
     gcstate->young.available_memory -= size;
+    gcstate->allocated += size;
     if (gcstate->young.available_memory < 0) {
         gcstate->young.available_memory = 0;
         if (gcstate->enabled && gcstate->young.threshold &&
